@@ -45,7 +45,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Más adelante, envolveremos 'children' con un AdminLayout.
   // Por ahora, solo renderizamos los hijos directamente.
   // return <AdminLayout>{children}</AdminLayout>;
-  return <>{children}</>; // Usamos un Fragment por ahora, lo cambiaremos por AdminLayout
+  return <AdminLayout>{children}</AdminLayout>; // Usamos un Fragment por ahora, lo cambiaremos por AdminLayout
 };
 
 export default ProtectedRoute;
