@@ -1,0 +1,36 @@
+# Dependencias
+node_modules/  # CORRECTO: Nunca subir node_modules. Se instalan en el build de Docker.
+
+# Archivos de entorno
+.env           # CORRECTO: Ignora el archivo .env principal con secretos.
+*.env          # CORRECTO: Ignora cualquier archivo que termine en .env.
+.env.* # CORRECTO: Ignora archivos como .env.local, .env.production.
+!/.env.example # CORRECTO: Asegura que .env.example SÍ se suba, para referencia.
+
+# Archivos de logs
+logs           # CORRECTO: Si tu app genera una carpeta 'logs'.
+*.log          # CORRECTO: Cualquier archivo de log.
+npm-debug.log* # CORRECTO: Logs de debug de npm.
+yarn-debug.log*# CORRECTO: Logs de debug de yarn (aunque usas npm).
+yarn-error.log*# CORRECTO.
+lerna-debug.log*# CORRECTO: Si usaras Lerna (para monorepos).
+
+# Directorio de subidas locales (si no usas Cloudinary y sirves desde aquí)
+uploads/       # IMPORTANTE: Analicemos esto.
+
+# Archivos de sistema operativo
+.DS_Store      # CORRECTO (macOS).
+Thumbs.db      # CORRECTO (Windows).
+
+# Archivos de build (si los tuvieras en el backend)
+dist/          # CORRECTO: Si tuvieras un paso de build que genere una carpeta 'dist'.
+build/         # CORRECTO: Otra carpeta común de build.
+
+# Archivos de IDE
+.idea/         # CORRECTO (IntelliJ, WebStorm).
+.vscode/       # CORRECTO (Visual Studio Code).
+*.suo          # CORRECTO (Visual Studio).
+*.ntvs* # CORRECTO.
+*.njsproj      # CORRECTO.
+*.sln          # CORRECTO.
+*.sw?          # CORRECTO.
