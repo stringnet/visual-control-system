@@ -5,10 +5,10 @@ import { AuthProvider } from './contexts/AuthContext'; // Importa el AuthProvide
 
 // Importa los componentes de página y layout
 import LoginPage from './pages/LoginPage';
-// import AdminLayout from './components/Layout/AdminLayout'; // AdminLayout se usa dentro de ProtectedRoute
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import MediaPage from './pages/MediaPage'; 
-import ActivatorsPage from './pages/ActivatorsPage'; // Importamos la página real de Activadores
+import ActivatorsPage from './pages/ActivatorsPage';
+import VisualizerDisplayPage from './pages/VisualizerDisplayPage'; // Importamos la página del Visualizador
 
 // Placeholder para la página de Dashboard
 const DashboardPagePlaceholder = () => (
@@ -18,15 +18,6 @@ const DashboardPagePlaceholder = () => (
     <p className="mt-2">Próximamente: Estadísticas y accesos directos.</p>
   </div>
 );
-
-// Ya no necesitamos ActivatorsPagePlaceholder
-// const ActivatorsPagePlaceholder = () => (
-//   <div className="p-6 text-slate-700">
-//     <h2 className="text-2xl font-semibold mb-4">Gestión de Activadores</h2>
-//     <p>Crea y configura los activadores. Cada activador se asocia a un visualizador y puede tener asignado un archivo multimedia.</p>
-//     <p className="mt-2">Próximamente: Formulario para crear activadores y listado para gestionarlos.</p>
-//   </div>
-// );
 
 const NotFoundPage = () => (
   <div className="flex flex-col items-center justify-center h-full text-center p-10">
@@ -45,12 +36,12 @@ const NotFoundPage = () => (
 
 function App() {
   return (
-    <AuthProvider> {/* Envuelve toda la aplicación con AuthProvider */}
+    <AuthProvider> {/* AuthProvider envuelve todas las rutas */}
       <Routes>
-        {/* Ruta pública para el login */}
+        {/* Ruta pública para el login del panel de administración */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Rutas protegidas que usarán AdminLayout */}
+        {/* Rutas protegidas para el panel de administración */}
         <Route 
           path="/dashboard" 
           element={
@@ -71,11 +62,19 @@ function App() {
           path="/activators" 
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <ActivatorsPage /> {/* Usamos el componente ActivatorsPage real */}
+              <ActivatorsPage />
             </ProtectedRoute>
           } 
         />
         
+        {/* Ruta pública para los Visualizadores */}
+        {/* Esta ruta no está envuelta en ProtectedRoute porque es para el público */}
+        <Route 
+          path="/visualizer/:visualizerId" 
+          element={<VisualizerDisplayPage />} 
+        />
+        
+        {/* Redirección por defecto para la raíz del panel de administración */}
         <Route 
           path="/" 
           element={
@@ -85,6 +84,8 @@ function App() {
           } 
         />
         
+        {/* Ruta para manejar 404 dentro del panel de administración (si está logueado) */}
+        {/* Si se accede a una ruta no definida y está logueado, muestra este 404 */}
         <Route 
           path="*" 
           element={
@@ -93,6 +94,13 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        {/* Nota: Si se accede a una ruta totalmente desconocida y no está logueado, 
+            React Router podría no tener un "catch-all" público a menos que se defina uno explícitamente
+            fuera de cualquier ProtectedRoute. Por ahora, las rutas no definidas del panel admin
+            lo llevarán al login si no está autenticado.
+            Si se accede a /visualizer/ruta-inexistente, VisualizerDisplayPage manejará el error
+            de contenido no encontrado.
+        */}
 
       </Routes>
     </AuthProvider>
