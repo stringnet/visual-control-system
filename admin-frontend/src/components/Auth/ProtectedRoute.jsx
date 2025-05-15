@@ -3,7 +3,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext'; // Importa el hook useAuth
 // Importaremos AdminLayout más adelante. Por ahora, podemos usar un div simple o un Fragment.
-// import AdminLayout from '../Layout/AdminLayout'; 
+import AdminLayout from '../Layout/AdminLayout'; 
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user, loading } = useAuth();
