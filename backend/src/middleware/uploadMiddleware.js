@@ -1,77 +1,53 @@
+// backend/src/middleware/uploadMiddleware.js
 const multer = require('multer');
-const path = require('path');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// const path = require('path'); // Ya no es estrictamente necesario aquí para la lógica de almacenamiento
 const cloudinaryV2 = require('cloudinary').v2;
 
-// Configurar Cloudinary si las variables de entorno están presentes
-let storage;
-if (process.env.CLOUDINARY_URL && process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+// Configurar el SDK de Cloudinary v2 si las variables de entorno están presentes.
+// Esta configuración es para el uso general del SDK de Cloudinary (ej. en controladores).
+if (process.env.CLOUDINARY_CLOUD_NAME && 
+    process.env.CLOUDINARY_API_KEY && 
+    process.env.CLOUDINARY_API_SECRET) {
     cloudinaryV2.config({
         cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
         api_key: process.env.CLOUDINARY_API_KEY,
         api_secret: process.env.CLOUDINARY_API_SECRET,
+        secure: true, // Es buena práctica forzar URLs seguras (https)
     });
-
-    storage = new CloudinaryStorage({
-        cloudinary: cloudinaryV2,
-        params: async (req, file) => {
-            let folderName = 'easypanel_media/general';
-            let resourceType = 'auto';
-
-            if (file.mimetype.startsWith('image/')) {
-                folderName = 'easypanel_media/images';
-                resourceType = 'image';
-            } else if (file.mimetype.startsWith('video/')) {
-                folderName = 'easypanel_media/videos';
-                resourceType = 'video';
-            }
-
-            return {
-                folder: folderName,
-                public_id: `${file.fieldname}-${Date.now()}-${Math.round(Math.random() * 1E3)}`,
-                resource_type: resourceType,
-                // Opcional: Transformaciones al subir
-                // eager: [{ width: 500, height: 500, crop: 'limit', quality: 'auto' }],
-            };
-        },
-    });
-    console.log("☁️ Usando Cloudinary para almacenamiento de media.");
+    console.log("☁️ SDK de Cloudinary v2 configurado exitosamente.");
 } else {
-    // Fallback a almacenamiento local si Cloudinary no está configurado
-    console.warn("⚠️ Cloudinary no configurado, usando almacenamiento local para media. Asegúrate que la carpeta 'uploads/' exista en la raíz del backend.");
-    storage = multer.diskStorage({
-        destination: function (req, file, cb) {
-            const uploadDir = path.join(__dirname, '../../uploads'); // Ruta a la carpeta uploads
-            // Asegurarse que el directorio existe (opcional, Multer puede fallar si no existe)
-            // const fs = require('fs');
-            // if (!fs.existsSync(uploadDir)){
-            //     fs.mkdirSync(uploadDir, { recursive: true });
-            // }
-            cb(null, uploadDir);
-        },
-        filename: function (req, file, cb) {
-            cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-        }
-    });
+    // Es importante advertir si Cloudinary no está configurado, ya que las subidas fallarán.
+    console.warn("⚠️ ADVERTENCIA: Las variables de entorno de Cloudinary no están completamente configuradas. Las operaciones con Cloudinary (como la subida de archivos) podrían fallar.");
 }
 
+// Configurar Multer para usar almacenamiento en memoria (memoryStorage).
+// Esto hace que el archivo se guarde como un buffer en req.file.buffer.
+const storage = multer.memoryStorage();
+
+// Definir un filtro de archivos para aceptar solo imágenes y videos.
 const fileFilter = (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
-        cb(null, true);
+        cb(null, true); // Aceptar el archivo
     } else {
+        // Rechazar el archivo con un mensaje de error específico.
         cb(new Error('Tipo de archivo no soportado. Solo se permiten imágenes y videos.'), false);
     }
 };
 
+// Crear la instancia de Multer con la configuración de almacenamiento, límites y filtro.
 const upload = multer({
-    storage: storage,
+    storage: storage, // Usar el almacenamiento en memoria definido arriba.
     limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB (ajusta según tus necesidades)
+        fileSize: 50 * 1024 * 1024 // Límite de tamaño de archivo de 50MB (ajustar según sea necesario).
     },
-    fileFilter: fileFilter,
+    fileFilter: fileFilter, // Aplicar el filtro de tipo de archivo.
 });
 
-// Middleware para un solo archivo llamado 'mediaFile' en el formulario
-const uploadSingleMedia = upload.single('mediaFile');
+// Middleware para procesar la subida de un solo archivo.
+// El archivo estará disponible en `req.file` en el siguiente middleware o controlador.
+// 'mediaFile' debe ser el nombre del campo (<input type="file" name="mediaFile">) en el formulario del cliente.
+const uploadSingleMediaInMemory = upload.single('mediaFile');
 
-module.exports = { uploadSingleMedia, cloudinaryV2 }; // Exportar cloudinaryV2 para poder usar su API (ej. para borrar)
+// Exportar el middleware de subida y la instancia configurada de cloudinaryV2.
+// cloudinaryV2 se exporta para que pueda ser utilizado por los controladores para operaciones como el borrado.
+module.exports = { uploadSingleMediaInMemory, cloudinaryV2 };
