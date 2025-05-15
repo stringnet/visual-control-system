@@ -1,28 +1,68 @@
 // admin-frontend/src/pages/VisualizerDisplayPage.jsx
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import api from '../services/api'; // Nuestro servicio API
 import io from 'socket.io-client'; // Cliente de Socket.IO
-import { Maximize, Image as ImageIcon, Video as VideoIcon, WifiOff, Loader2, AlertTriangle } from 'lucide-react';
+import { Maximize, Image as ImageIcon, Video as VideoIcon, WifiOff, Loader2, AlertTriangle, VolumeX, Volume2, PlayCircle } from 'lucide-react';
 
-// La URL base de tu servidor de Socket.IO.
-// Vite reemplazará import.meta.env.VITE_SOCKET_URL con el valor que configures
-// en las variables de entorno de build en Easypanel (o en un .env local para desarrollo).
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:3001'; // Fallback para desarrollo
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:3001';
 
 const FullScreenMedia = ({ mediaUrl, mediaType }) => {
   const videoRef = useRef(null);
+  const [isMuted, setIsMuted] = useState(true); // Empezar silenciado para mejorar chances de autoplay visual
+  const [showPlayButton, setShowPlayButton] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
 
   useEffect(() => {
-    // Intentar reproducir video automáticamente cuando cambie la URL
     if (mediaType === 'video' && videoRef.current) {
-      videoRef.current.load(); // Recargar si la fuente cambia
-      videoRef.current.play().catch(error => {
-        console.warn("Video autoplay fue prevenido por el navegador:", error.message);
-        // Los navegadores a menudo requieren interacción del usuario o que el video esté silenciado.
+      const videoElement = videoRef.current;
+      videoElement.load(); // Recargar si la fuente cambia
+
+      const playPromise = videoElement.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          // Autoplay visual (probablemente silenciado) comenzó exitosamente.
+          setShowPlayButton(false); // Ocultar botón de play si el autoplay visual funciona
+          // Si queríamos audio desde el inicio y no está silenciado, aquí estaría sonando.
+          // Si está silenciado, el usuario necesitará interactuar para desilenciar.
+        }).catch(error => {
+          console.warn("Video autoplay visual fue prevenido o falló:", error.message);
+          // Autoplay falló, mostrar un botón de play para que el usuario inicie.
+          setShowPlayButton(true);
+          setIsMuted(false); // Preparar para reproducir con sonido cuando el usuario haga clic
+        });
+      }
+    }
+    // Resetear estados si la URL o tipo cambian
+    return () => {
+        setShowPlayButton(false);
+        setUserInteracted(false);
+        // No cambiamos isMuted aquí para que persista la elección del usuario si es posible
+    };
+  }, [mediaUrl, mediaType]);
+
+  const handlePlayWithSound = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      setIsMuted(false);
+      videoRef.current.play().then(() => {
+        setShowPlayButton(false);
+        setUserInteracted(true);
+      }).catch(error => {
+        console.error("Error al intentar reproducir con sonido tras interacción:", error);
+        // Podría ser necesario otro tipo de interacción o el navegador sigue bloqueando.
       });
     }
-  }, [mediaUrl, mediaType]);
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+      setUserInteracted(true); // El usuario ha interactuado
+      setShowPlayButton(false); // Si desilencia, asumimos que quiere que siga reproduciendo
+    }
+  };
 
   if (!mediaUrl || !mediaType) {
     return (
@@ -35,7 +75,7 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
   }
 
   return (
-    <div className="w-full h-full bg-black flex items-center justify-center overflow-hidden">
+    <div className="w-full h-full bg-black flex items-center justify-center overflow-hidden relative">
       {mediaType === 'image' && (
         <img 
           src={mediaUrl} 
@@ -44,26 +84,54 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
           onError={(e) => {
             console.error("Error al cargar la imagen:", mediaUrl);
             e.target.alt = "Error al cargar imagen";
-            // Podrías mostrar una imagen placeholder aquí
           }}
         />
       )}
       {mediaType === 'video' && (
-        <video
-          ref={videoRef}
-          src={mediaUrl}
-          autoPlay
-          loop
-          muted // Importante para autoplay en muchos navegadores
-          playsInline // Necesario para iOS
-          className="max-w-full max-h-full object-contain"
-          onError={(e) => {
-            console.error("Error al cargar el video:", mediaUrl, e);
-            // Podrías mostrar un mensaje de error de video aquí
-          }}
-        >
-          Tu navegador no soporta la etiqueta de video.
-        </video>
+        <>
+          <video
+            ref={videoRef}
+            src={mediaUrl}
+            autoPlay // Intentar autoplay
+            loop
+            playsInline // Necesario para iOS
+            muted={isMuted && !userInteracted} // Empezar silenciado, pero si el usuario interactuó, respetar su elección
+            className="max-w-full max-h-full object-contain"
+            onClick={mediaType === 'video' ? toggleMute : undefined} // Permitir tocar el video para (des)silenciar
+            onPlay={() => {
+                // Si el video comienza a reproducirse (incluso silenciado),
+                // y el usuario aún no ha interactuado para el sonido,
+                // podríamos mantener el botón de desilenciar si está silenciado.
+                if(videoRef.current && videoRef.current.muted) setIsMuted(true); else setIsMuted(false);
+            }}
+            onError={(e) => {
+              console.error("Error al cargar el video:", mediaUrl, e);
+            }}
+          >
+            Tu navegador no soporta la etiqueta de video.
+          </video>
+          
+          {showPlayButton && !userInteracted && (
+            <button
+              onClick={handlePlayWithSound}
+              className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-20 cursor-pointer"
+              aria-label="Reproducir video con sonido"
+            >
+              <PlayCircle size={80} className="text-white opacity-80 hover:opacity-100 transition-opacity" />
+            </button>
+          )}
+
+          {/* Botón para (des)silenciar si el video se está reproduciendo y el usuario ya interactuó o si no hay botón de play */}
+          {mediaType === 'video' && videoRef.current && !showPlayButton && (
+            <button
+              onClick={toggleMute}
+              className="absolute bottom-4 right-4 bg-black bg-opacity-60 text-white p-3 rounded-full hover:bg-opacity-80 transition-opacity z-20"
+              title={isMuted ? "Activar sonido" : "Silenciar"}
+            >
+              {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -71,34 +139,23 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
 
 
 const VisualizerDisplayPage = () => {
-  const { visualizerId } = useParams(); // Obtiene el :visualizerId de la URL
-  const navigate = useNavigate(); // Para redirección si es necesario (ej. login)
-  
-  const [mediaContent, setMediaContent] = useState(null); // { url, mediaType }
+  const { visualizerId } = useParams();
+  const [mediaContent, setMediaContent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [socketConnected, setSocketConnected] = useState(false);
   const socketRef = useRef(null);
 
   useEffect(() => {
-    // No se requiere autenticación de admin para ver un visualizador público,
-    // pero el backend sí protegerá la ruta /api/activators/content/:visualizerId
-    // si así lo configuramos (actualmente está protegida por `isViewer` que incluye `isAdmin`).
-    // Si los visualizadores requieren un login de "viewer", esa lógica iría aquí.
-
     const fetchInitialContent = async () => {
       setIsLoading(true);
       setError('');
       try {
-        // El backend debe tener una ruta pública o protegida por un token de "viewer"
-        // para obtener el contenido inicial del visualizador.
-        // Asumimos que /api/activators/content/:visualizerId es accesible.
-        // Si requiere un token de "viewer", habría que manejar ese login primero.
         const response = await api.get(`/activators/content/${visualizerId}`);
         if (response.data && response.data.mediaContent) {
           setMediaContent(response.data.mediaContent);
         } else {
-          setMediaContent(null); // No hay contenido o activador inactivo
+          setMediaContent(null);
         }
       } catch (err) {
         console.error("Error al obtener contenido inicial del visualizador:", err.response ? err.response.data : err);
@@ -111,13 +168,9 @@ const VisualizerDisplayPage = () => {
 
     fetchInitialContent();
 
-    // Configurar Socket.IO
-    // Usamos una ref para el socket para evitar reconexiones en cada render si SOCKET_URL no cambia.
     if (!socketRef.current) {
         socketRef.current = io(SOCKET_URL, {
-            reconnectionAttempts: 5, // Intentar reconectar 5 veces
-            // Podrías añadir query params si necesitas pasar info al conectar, ej. el visualizerId
-            // query: { visualizerId } 
+            reconnectionAttempts: 5,
         });
     }
     const socket = socketRef.current;
@@ -125,7 +178,6 @@ const VisualizerDisplayPage = () => {
     socket.on('connect', () => {
       console.log(`Visualizador conectado a Socket.IO. ID de Socket: ${socket.id}`);
       setSocketConnected(true);
-      // Unirse a una sala específica para este visualizerId
       socket.emit('joinVisualizerRoom', visualizerId);
     });
 
@@ -140,38 +192,23 @@ const VisualizerDisplayPage = () => {
         setError(`Error de conexión en tiempo real: ${err.message}. Intentando reconectar...`);
     });
     
-    // Escuchar actualizaciones de contenido para este visualizador específico
     socket.on('contentUpdate', (data) => {
       if (data.visualizerId === visualizerId) {
         console.log('Actualización de contenido recibida:', data.mediaContent);
-        setMediaContent(data.mediaContent); // mediaContent puede ser null
-        setError(''); // Limpiar errores si llega una actualización
+        setMediaContent(data.mediaContent);
+        setError('');
       }
     });
 
-    // Limpieza al desmontar el componente
     return () => {
       console.log('Desmontando VisualizerDisplayPage, desconectando socket...');
       if (socketRef.current) {
         socketRef.current.emit('leaveVisualizerRoom', visualizerId);
         socketRef.current.disconnect();
-        socketRef.current = null; // Limpiar la referencia
+        socketRef.current = null;
       }
     };
-  }, [visualizerId]); // Dependencia: visualizerId
-
-  // Pantalla completa al montar (opcional)
-  // const requestFullScreen = () => {
-  //   const elem = document.documentElement;
-  //   if (elem.requestFullscreen) {
-  //     elem.requestFullscreen().catch(err => console.warn(err.message));
-  //   } else if (elem.webkitRequestFullscreen) { /* Safari */
-  //     elem.webkitRequestFullscreen().catch(err => console.warn(err.message));
-  //   }
-  // };
-  // useEffect(() => {
-  //   // requestFullScreen(); // Podrías llamarlo aquí o con un botón
-  // }, []);
+  }, [visualizerId]);
 
   return (
     <div className="w-screen h-screen bg-black text-white flex flex-col items-center justify-center relative">
@@ -181,7 +218,7 @@ const VisualizerDisplayPage = () => {
           <p className="text-lg text-slate-300">Cargando visualizador: {visualizerId}...</p>
         </div>
       )}
-      {!isLoading && error && (
+      {!isLoading && error && !mediaContent && ( // Mostrar error solo si no hay mediaContent
          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-10 p-8 text-center">
           <AlertTriangle size={48} className="text-red-500 mb-4" />
           <p className="text-xl text-red-400 mb-2">Error al Cargar Contenido</p>
@@ -189,21 +226,11 @@ const VisualizerDisplayPage = () => {
         </div>
       )}
       
-      {/* Componente para mostrar la media */}
       {!isLoading && <FullScreenMedia mediaUrl={mediaContent?.url} mediaType={mediaContent?.mediaType} />}
 
-      {/* Overlay con información (opcional, para depuración o info) */}
-      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-xs text-slate-300 p-2 rounded">
+      <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-xs text-slate-300 p-2 rounded z-30">
         Visualizador ID: {visualizerId} | Socket: {socketConnected ? <span className="text-green-400">Conectado</span> : <span className="text-red-400">Desconectado</span>}
       </div>
-      {/* Botón para pantalla completa (si no es automático) */}
-      {/* <button 
-        onClick={requestFullScreen} 
-        className="absolute top-2 right-2 bg-slate-700 bg-opacity-50 hover:bg-opacity-75 p-2 rounded-full"
-        title="Pantalla Completa"
-      >
-        <Maximize size={20} />
-      </button> */}
     </div>
   );
 };
