@@ -4,9 +4,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext'; // Importa el AuthProvider
 
 // Importa los componentes de página y layout
-import LoginPage from './pages/LoginPage'; // Ya lo creamos
-import AdminLayout from './components/Layout/AdminLayout'; // Ya lo creamos
-import ProtectedRoute from './components/Auth/ProtectedRoute'; // Ya lo creamos
+import LoginPage from './pages/LoginPage';
+// import AdminLayout from './components/Layout/AdminLayout'; // AdminLayout se usa dentro de ProtectedRoute
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+import MediaPage from './pages/MediaPage'; // Importamos la página real de Multimedia
 
 // Placeholders para las páginas de contenido (las crearemos más adelante)
 const DashboardPagePlaceholder = () => (
@@ -16,13 +17,14 @@ const DashboardPagePlaceholder = () => (
     <p className="mt-2">Próximamente: Estadísticas y accesos directos.</p>
   </div>
 );
-const MediaPagePlaceholder = () => (
-  <div className="p-6 text-slate-700">
-    <h2 className="text-2xl font-semibold mb-4">Gestión de Multimedia</h2>
-    <p>Aquí podrás subir, ver y eliminar las imágenes y videos que se usarán en los visualizadores.</p>
-    <p className="mt-2">Próximamente: Formulario de subida y listado de archivos.</p>
-  </div>
-);
+// Ya no necesitamos MediaPagePlaceholder
+// const MediaPagePlaceholder = () => (
+//   <div className="p-6 text-slate-700">
+//     <h2 className="text-2xl font-semibold mb-4">Gestión de Multimedia</h2>
+//     <p>Aquí podrás subir, ver y eliminar las imágenes y videos que se usarán en los visualizadores.</p>
+//     <p className="mt-2">Próximamente: Formulario de subida y listado de archivos.</p>
+//   </div>
+// );
 const ActivatorsPagePlaceholder = () => (
   <div className="p-6 text-slate-700">
     <h2 className="text-2xl font-semibold mb-4">Gestión de Activadores</h2>
@@ -66,7 +68,7 @@ function App() {
           path="/media" 
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <MediaPagePlaceholder />
+              <MediaPage /> {/* Usamos el componente MediaPage real */}
             </ProtectedRoute>
           } 
         />
@@ -94,20 +96,14 @@ function App() {
         />
         
         {/* Ruta para manejar 404 (Página No Encontrada) */}
-        {/* Esta ruta debe estar al final para que capture cualquier ruta no definida previamente */}
         <Route 
           path="*" 
           element={
-            <ProtectedRoute allowedRoles={['admin']}> {/* Para que el 404 se muestre dentro del layout si está logueado */}
+            <ProtectedRoute allowedRoles={['admin']}>
               <NotFoundPage />
             </ProtectedRoute>
           } 
         />
-        {/* Si quieres un 404 público (fuera del layout si no está logueado), necesitarías una lógica más compleja
-            o definir una ruta 404 fuera de ProtectedRoute que se muestre si ninguna otra ruta coincide Y NO está autenticado.
-            Por simplicidad, este 404 se mostrará dentro del layout si está logueado y accede a una ruta inválida.
-            Si no está logueado y accede a una ruta inválida, será redirigido a /login.
-        */}
 
       </Routes>
     </AuthProvider>
