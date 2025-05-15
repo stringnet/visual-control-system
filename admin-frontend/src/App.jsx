@@ -7,9 +7,10 @@ import { AuthProvider } from './contexts/AuthContext'; // Importa el AuthProvide
 import LoginPage from './pages/LoginPage';
 // import AdminLayout from './components/Layout/AdminLayout'; // AdminLayout se usa dentro de ProtectedRoute
 import ProtectedRoute from './components/Auth/ProtectedRoute';
-import MediaPage from './pages/MediaPage'; // Importamos la página real de Multimedia
+import MediaPage from './pages/MediaPage'; 
+import ActivatorsPage from './pages/ActivatorsPage'; // Importamos la página real de Activadores
 
-// Placeholders para las páginas de contenido (las crearemos más adelante)
+// Placeholder para la página de Dashboard
 const DashboardPagePlaceholder = () => (
   <div className="p-6 text-slate-700">
     <h2 className="text-2xl font-semibold mb-4">Bienvenido al Dashboard</h2>
@@ -17,21 +18,16 @@ const DashboardPagePlaceholder = () => (
     <p className="mt-2">Próximamente: Estadísticas y accesos directos.</p>
   </div>
 );
-// Ya no necesitamos MediaPagePlaceholder
-// const MediaPagePlaceholder = () => (
+
+// Ya no necesitamos ActivatorsPagePlaceholder
+// const ActivatorsPagePlaceholder = () => (
 //   <div className="p-6 text-slate-700">
-//     <h2 className="text-2xl font-semibold mb-4">Gestión de Multimedia</h2>
-//     <p>Aquí podrás subir, ver y eliminar las imágenes y videos que se usarán en los visualizadores.</p>
-//     <p className="mt-2">Próximamente: Formulario de subida y listado de archivos.</p>
+//     <h2 className="text-2xl font-semibold mb-4">Gestión de Activadores</h2>
+//     <p>Crea y configura los activadores. Cada activador se asocia a un visualizador y puede tener asignado un archivo multimedia.</p>
+//     <p className="mt-2">Próximamente: Formulario para crear activadores y listado para gestionarlos.</p>
 //   </div>
 // );
-const ActivatorsPagePlaceholder = () => (
-  <div className="p-6 text-slate-700">
-    <h2 className="text-2xl font-semibold mb-4">Gestión de Activadores</h2>
-    <p>Crea y configura los activadores. Cada activador se asocia a un visualizador y puede tener asignado un archivo multimedia.</p>
-    <p className="mt-2">Próximamente: Formulario para crear activadores y listado para gestionarlos.</p>
-  </div>
-);
+
 const NotFoundPage = () => (
   <div className="flex flex-col items-center justify-center h-full text-center p-10">
     <h1 className="text-6xl font-bold text-blue-600 mb-4">404</h1>
@@ -55,11 +51,10 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
 
         {/* Rutas protegidas que usarán AdminLayout */}
-        {/* El componente ProtectedRoute se encarga de la lógica de autenticación y de renderizar AdminLayout */}
         <Route 
           path="/dashboard" 
           element={
-            <ProtectedRoute allowedRoles={['admin']}> {/* Solo admins pueden acceder */}
+            <ProtectedRoute allowedRoles={['admin']}>
               <DashboardPagePlaceholder />
             </ProtectedRoute>
           } 
@@ -68,7 +63,7 @@ function App() {
           path="/media" 
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <MediaPage /> {/* Usamos el componente MediaPage real */}
+              <MediaPage />
             </ProtectedRoute>
           } 
         />
@@ -76,16 +71,11 @@ function App() {
           path="/activators" 
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <ActivatorsPagePlaceholder />
+              <ActivatorsPage /> {/* Usamos el componente ActivatorsPage real */}
             </ProtectedRoute>
           } 
         />
         
-        {/* Redirección por defecto: 
-            - Si el usuario intenta ir a la raíz "/", ProtectedRoute manejará la lógica.
-            - Si está autenticado y es admin, irá al dashboard (o a la página desde la que fue redirigido).
-            - Si no está autenticado, será redirigido a /login por ProtectedRoute.
-        */}
         <Route 
           path="/" 
           element={
@@ -95,7 +85,6 @@ function App() {
           } 
         />
         
-        {/* Ruta para manejar 404 (Página No Encontrada) */}
         <Route 
           path="*" 
           element={
