@@ -24,8 +24,9 @@ LABEL description="Backend para la aplicación de administración y visualizaci�
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-ENV PORT=3001 # El puerto en el que tu aplicación Express escucha DENTRO del contenedor
 
+# El puerto en el que tu aplicación Express escucha DENTRO del contenedor
+ENV PORT=3001
 WORKDIR /app
 
 # Copiar package.json y package-lock.json
