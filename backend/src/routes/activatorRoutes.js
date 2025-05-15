@@ -1,3 +1,4 @@
+// backend/src/routes/activatorRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,19 +8,20 @@ const {
     updateActivatorInfo,
     assignMediaToActivator,
     deleteExistingActivator,
-    getVisualizerDisplayContent,
+    getVisualizerDisplayContent, // Daytoy ti function a maus-usar para iti /content/:visualizerId
 } = require('../controllers/activatorController');
-const { isAdmin, isViewer } = require('../middleware/authMiddleware'); // `protect` global
+const { isAdmin, isViewer, protect } = require('../middleware/authMiddleware'); // Importar ti protect tapno mausar kadagiti dadduma a ruta
 
-// Rutas para Administradores
-router.post('/', isAdmin, createNewActivator);
-router.get('/', isAdmin, getAllActivatorsAdmin);
-router.get('/:id', isAdmin, getActivatorDetailsById);
-router.put('/:id', isAdmin, updateActivatorInfo);
-router.patch('/:id/assign-media', isAdmin, assignMediaToActivator);
-router.delete('/:id', isAdmin, deleteExistingActivator);
+// Rutas para dagiti Administradores (amin dagitoy ket protektado)
+router.post('/', protect, isAdmin, createNewActivator);
+router.get('/', protect, isAdmin, getAllActivatorsAdmin);
+router.get('/:id', protect, isAdmin, getActivatorDetailsById);
+router.put('/:id', protect, isAdmin, updateActivatorInfo);
+router.patch('/:id/assign-media', protect, isAdmin, assignMediaToActivator);
+router.delete('/:id', protect, isAdmin, deleteExistingActivator);
 
-// Ruta para el frontend del Visualizador (protegida para viewers o admins)
-router.get('/content/:visualizerId', isViewer, getVisualizerDisplayContent);
+// Ruta para ti frontend ti Visualizador (para ti publiko)
+// Inikkat ti 'isViewer' (ken ti 'protect' a nairaman) tapno daytoy a ruta ket publiko
+router.get('/content/:visualizerId', getVisualizerDisplayContent);
 
 module.exports = router;
