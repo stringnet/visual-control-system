@@ -1,0 +1,16 @@
+# backend/.dockerignore
+node_modules
+npm-debug.log
+yarn-error.log
+.env
+.env.*
+!/.env.example
+.git
+.gitignore
+*.md
+# Comentar la siguiente línea si SÍ quieres incluir la carpeta uploads en la imagen
+# (aunque la persistencia debe ser por volumen)
+uploads/
+# Cualquier otro archivo/carpeta que no sea necesario para ejecutar la aplicación en producción
+.vscode/
+.idea/
