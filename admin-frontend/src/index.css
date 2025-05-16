@@ -20,3 +20,19 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/* Animación para el logo del Pixel Map */
+@keyframes pulse-slow {
+  0%, 100% { 
+    opacity: 0.8; 
+    transform: scale(0.98); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.02); 
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s infinite ease-in-out;
+}
