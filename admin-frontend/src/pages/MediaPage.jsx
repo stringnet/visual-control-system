@@ -3,8 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { 
     UploadCloud, Image as ImageIcon, Video as VideoIcon, Globe as WebpageIcon, 
-    Trash2, AlertCircle, CheckCircle, Loader2, Link2, Palette, Music, FileImage 
-} from 'lucide-react'; // Añadidos Palette, Music, FileImage
+    Trash2, AlertCircle, CheckCircle, Loader2, Link2, Palette, Music, FileImage, PlusCircle 
+} from 'lucide-react'; // Añadido PlusCircle que faltaba en la importación anterior
 
 const MediaPage = () => {
   const [uploadType, setUploadType] = useState('file'); // 'file', 'url', o 'pixelmap'
@@ -65,7 +65,6 @@ const MediaPage = () => {
   };
 
   const handleMainFileChange = (event) => {
-    // Para el tipo 'file' (imagen/video)
     const file = event.target.files[0];
     if (file) {
       let detectedType = '';
@@ -95,7 +94,7 @@ const MediaPage = () => {
         setError('El logo debe ser un archivo PNG para asegurar transparencia.');
         setLogoFile(null); setLogoPreview(null); return;
       }
-      if (file.size > 2 * 1024 * 1024) { // Límite para logo, ej. 2MB
+      if (file.size > 2 * 1024 * 1024) { 
           setError('El archivo del logo es demasiado grande. Límite 2MB.');
           setLogoFile(null); setLogoPreview(null); return;
       }
@@ -114,7 +113,7 @@ const MediaPage = () => {
         setError('Por favor, selecciona un archivo de audio válido (ej. MP3, WAV, OGG).');
         setAudioFile(null); return;
       }
-      if (file.size > 10 * 1024 * 1024) { // Límite para audio, ej. 10MB
+      if (file.size > 10 * 1024 * 1024) { 
           setError('El archivo de audio es demasiado grande. Límite 10MB.');
           setAudioFile(null); return;
       }
@@ -124,7 +123,7 @@ const MediaPage = () => {
   };
 
   const handleAddColor = () => {
-    if (pixelMapColors.length < 10) { // Limitar a 10 colores por ejemplo
+    if (pixelMapColors.length < 10) { 
         setPixelMapColors([...pixelMapColors, '#FFFFFF']);
     } else {
         setError("Se pueden añadir un máximo de 10 colores.");
@@ -136,7 +135,7 @@ const MediaPage = () => {
     setPixelMapColors(updatedColors);
   };
   const handleRemoveColor = (index) => {
-    if (pixelMapColors.length > 1) { // Mantener al menos un color
+    if (pixelMapColors.length > 1) { 
         setPixelMapColors(pixelMapColors.filter((_, i) => i !== index));
     } else {
         setError("Debe haber al menos un color.");
@@ -148,7 +147,7 @@ const MediaPage = () => {
     setIsUploading(true); setUploadProgress(0);
     
     const formData = new FormData();
-    let endpoint = '/media/upload'; // Endpoint general
+    let endpoint = '/media/upload'; 
 
     if (uploadType === 'file') {
       if (!selectedFile) { setError('Por favor, selecciona un archivo.'); setIsUploading(false); return; }
@@ -162,7 +161,7 @@ const MediaPage = () => {
     } else if (uploadType === 'pixelmap') {
       if (!pixelMapName) { setError('Nombre del Pixel Map es requerido.'); setIsUploading(false); return; }
       formData.append('pixelMapName', pixelMapName);
-      formData.append('pixelMapColors', JSON.stringify(pixelMapColors)); // Enviar colores como string JSON
+      formData.append('pixelMapColors', JSON.stringify(pixelMapColors)); 
       formData.append('mediaTypeInput', 'pixelmap');
       if (logoFile) formData.append('logoFile', logoFile);
       if (audioFile) formData.append('audioFile', audioFile);
@@ -171,9 +170,6 @@ const MediaPage = () => {
     try {
       const response = await api.post(endpoint, formData, {
         headers: { 
-          // Axios ajustará Content-Type a multipart/form-data automáticamente si formData contiene archivos
-          // Si solo enviamos JSON (como en el caso de URL sin archivos), se podría mantener application/json
-          // Pero como pixelmap puede tener archivos, es mejor dejar que Axios decida o forzar multipart
           ...( (uploadType === 'file' || (uploadType === 'pixelmap' && (logoFile || audioFile))) && {'Content-Type': 'multipart/form-data'} )
         },
         onUploadProgress: (progressEvent) => {
@@ -225,6 +221,49 @@ const MediaPage = () => {
     return <ImageIcon size={48} className="text-slate-400" />;
   };
 
+  // Refactorización de la lógica de renderizado de la lista de media
+  let mediaListContent;
+  if (isLoadingMedia) {
+    mediaListContent = <div className="flex justify-center items-center py-10"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p className="ml-3 text-slate-600">Cargando...</p></div>;
+  } else if (mediaItems.length === 0) {
+    mediaListContent = <p className="text-slate-500 text-center py-5">No hay contenido multimedia registrado todavía.</p>;
+  } else {
+    mediaListContent = (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {mediaItems.map((item) => (
+          <div key={item._id} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
+            <div className="aspect-w-16 aspect-h-9 bg-slate-100 flex items-center justify-center p-2">
+              {renderMediaIcon(item.mediaType)}
+            </div>
+            <div className="p-4 flex flex-col flex-grow">
+              <p className="text-sm font-medium text-slate-800 truncate" title={item.originalName}>{item.originalName}</p>
+              <p className="text-xs text-slate-500">
+                {item.mediaType === 'pixelmap' ? 'Config. Pixel Map' : (item.mediaType === 'webpage' ? 'Página Web' : formatBytes(item.size))}
+                {' - '} {new Date(item.createdAt).toLocaleDateString()}
+              </p>
+              {item.mediaType === 'webpage' && <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate" title={item.url}>Visitar: {item.url}</a>}
+              {item.mediaType === 'pixelmap' && (
+                <div className="mt-1 text-xs space-y-0.5">
+                  {item.pixelMapConfig?.logoUrl && <p className="text-slate-600 flex items-center"><FileImage size={12} className="mr-1 flex-shrink-0"/> Logo asignado</p>}
+                  {item.pixelMapConfig?.audioUrl && <p className="text-slate-600 flex items-center"><Music size={12} className="mr-1 flex-shrink-0"/> Audio asignado</p>}
+                  <div className="flex flex-wrap gap-1 mt-1" title={`Colores: ${item.pixelMapConfig?.colors?.join(', ')}`}>
+                    {item.pixelMapConfig?.colors?.slice(0, 5).map((color, idx) => (
+                      <div key={idx} style={{ backgroundColor: color }} className="w-3 h-3 rounded-sm border border-slate-300"></div>
+                    ))}
+                    {item.pixelMapConfig?.colors?.length > 5 && <span className="text-xxs text-slate-400">...</span>}
+                  </div>
+                </div>
+              )}
+              <button onClick={() => handleDeleteMedia(item._id, item.originalName)} className="mt-auto pt-2 w-full flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                <Trash2 size={14} className="mr-1.5" />Eliminar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="bg-white p-6 rounded-lg shadow-lg border border-slate-200">
@@ -236,15 +275,13 @@ const MediaPage = () => {
         <div className="mb-6">
           <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de contenido a añadir:</label>
           <div className="flex flex-wrap gap-2">
-            {/* Botones para seleccionar tipo de contenido */}
             <button onClick={() => { setUploadType('file'); resetUploadForm(); setError(''); setSuccessMessage(''); }} className={`px-4 py-2 rounded-md text-sm font-medium border flex items-center ${uploadType === 'file' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300'}`}><UploadCloud size={16} className="mr-2"/>Subir Archivo</button>
             <button onClick={() => { setUploadType('url'); resetUploadForm(); setError(''); setSuccessMessage(''); }} className={`px-4 py-2 rounded-md text-sm font-medium border flex items-center ${uploadType === 'url' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300'}`}><Link2 size={16} className="mr-2"/>Registrar URL Web</button>
             <button onClick={() => { setUploadType('pixelmap'); resetUploadForm(); setError(''); setSuccessMessage(''); }} className={`px-4 py-2 rounded-md text-sm font-medium border flex items-center ${uploadType === 'pixelmap' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300'}`}><Palette size={16} className="mr-2"/>Crear Pixel Map</button>
           </div>
         </div>
 
-        {/* Formulario para Subir Archivo (Imagen/Video) */}
-        {uploadType === 'file' && ( /* ... Contenido del formulario de archivo sin cambios ... */ 
+        {uploadType === 'file' && ( 
             <div className="space-y-4">
                 <div>
                     <label htmlFor="file-upload" className="block text-sm font-medium text-slate-600 mb-1">Seleccionar archivo (imagen o video, máx. 50MB)</label>
@@ -259,19 +296,17 @@ const MediaPage = () => {
                     </div>
                 </div>
                 {preview && selectedFile && (<div className="mt-4 p-4 border border-slate-200 rounded-md bg-slate-50"><h3 className="text-md font-medium text-slate-700 mb-2">Previsualización:</h3>{fileMediaType === 'image' && <img src={preview} alt="Previsualización" className="max-h-60 w-auto rounded-md shadow-sm mx-auto" />}{fileMediaType === 'video' && <video src={preview} controls className="max-h-60 w-auto rounded-md shadow-sm mx-auto">Tu navegador no soporta video.</video>}<p className="text-xs text-slate-500 mt-2 text-center">{selectedFile.name} ({formatBytes(selectedFile.size)})</p></div>)}
-                {isUploading && (<div className="w-full bg-slate-200 rounded-full h-2.5 mt-4"><div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div><p className="text-xs text-center text-slate-600 mt-1">{uploadProgress}% completado</p></div>)}
+                {isUploading && uploadType === 'file' && (<div className="w-full bg-slate-200 rounded-full h-2.5 mt-4"><div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div><p className="text-xs text-center text-slate-600 mt-1">{uploadProgress}% completado</p></div>)}
             </div>
         )}
 
-        {/* Formulario para Registrar URL de Página Web */}
-        {uploadType === 'url' && ( /* ... Contenido del formulario de URL sin cambios ... */ 
+        {uploadType === 'url' && ( 
             <div className="space-y-4">
                 <div><label htmlFor="contentUrl" className="block text-sm font-medium text-slate-700">URL de la Página Web</label><input type="url" id="contentUrl" value={contentUrl} onChange={(e) => setContentUrl(e.target.value)} required={uploadType === 'url'} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="https://ejemplo.com/pagina-interesante" /></div>
                 <div><label htmlFor="webpageTitle" className="block text-sm font-medium text-slate-700">Título para la Página Web (Opcional)</label><input type="text" id="webpageTitle" value={webpageTitle} onChange={(e) => setWebpageTitle(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Ej: Noticias en Vivo - Ejemplo.com" /><p className="mt-1 text-xs text-slate-500">Si se deja vacío, se usará la URL como título.</p></div>
             </div>
         )}
 
-        {/* Formulario para Crear Pixel Map */}
         {uploadType === 'pixelmap' && (
           <div className="space-y-6">
             <div>
@@ -304,6 +339,7 @@ const MediaPage = () => {
               <input type="file" id="audioFile" onChange={handleAudioFileChange} accept="audio/*" className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"/>
               {audioFile && <p className="text-xs text-slate-600 mt-1">Archivo de audio seleccionado: {audioFile.name}</p>}
             </div>
+             {isUploading && uploadType === 'pixelmap' && (<div className="w-full bg-slate-200 rounded-full h-2.5 mt-4"><div className="bg-orange-500 h-2.5 rounded-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div><p className="text-xs text-center text-slate-600 mt-1">{uploadProgress > 0 ? `${uploadProgress}% completado` : 'Procesando...'}</p></div>)}
           </div>
         )}
 
@@ -329,40 +365,7 @@ const MediaPage = () => {
       {/* Sección de Listado de Contenido Multimedia */}
       <div className="bg-white p-6 rounded-lg shadow-lg border border-slate-200">
         <h2 className="text-xl font-semibold text-slate-700 mb-4 border-b pb-3">Contenido Multimedia Registrado</h2>
-        {isLoadingMedia ? ( /* ... */ ) : mediaItems.length === 0 ? ( /* ... */ ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {mediaItems.map((item) => (
-              <div key={item._id} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                <div className="aspect-w-16 aspect-h-9 bg-slate-100 flex items-center justify-center p-2">
-                  {renderMediaIcon(item.mediaType)}
-                </div>
-                <div className="p-4 flex flex-col flex-grow">
-                  <p className="text-sm font-medium text-slate-800 truncate" title={item.originalName}>{item.originalName}</p>
-                  <p className="text-xs text-slate-500">
-                    {item.mediaType === 'pixelmap' ? 'Config. Pixel Map' : (item.mediaType === 'webpage' ? 'Página Web' : formatBytes(item.size))}
-                    {' - '} {new Date(item.createdAt).toLocaleDateString()}
-                  </p>
-                  {item.mediaType === 'webpage' && <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate" title={item.url}>Visitar: {item.url}</a>}
-                  {item.mediaType === 'pixelmap' && (
-                    <div className="mt-1 text-xs space-y-0.5">
-                      {item.pixelMapConfig?.logoUrl && <p className="text-slate-600 flex items-center"><FileImage size={12} className="mr-1 flex-shrink-0"/> Logo asignado</p>}
-                      {item.pixelMapConfig?.audioUrl && <p className="text-slate-600 flex items-center"><Music size={12} className="mr-1 flex-shrink-0"/> Audio asignado</p>}
-                      <div className="flex flex-wrap gap-1 mt-1" title={`Colores: ${item.pixelMapConfig?.colors?.join(', ')}`}>
-                        {item.pixelMapConfig?.colors?.slice(0, 5).map((color, idx) => ( // Mostrar hasta 5 colores
-                          <div key={idx} style={{ backgroundColor: color }} className="w-3 h-3 rounded-sm border border-slate-300"></div>
-                        ))}
-                        {item.pixelMapConfig?.colors?.length > 5 && <span className="text-xxs text-slate-400">...</span>}
-                      </div>
-                    </div>
-                  )}
-                  <button onClick={() => handleDeleteMedia(item._id, item.originalName)} className="mt-auto pt-2 w-full flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
-                    <Trash2 size={14} className="mr-1.5" />Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {mediaListContent}
       </div>
     </div>
   );
