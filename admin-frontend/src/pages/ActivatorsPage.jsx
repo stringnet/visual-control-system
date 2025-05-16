@@ -1,7 +1,11 @@
 // admin-frontend/src/pages/ActivatorsPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
-import { PlusCircle, Edit3, Trash2, Link as LinkIcon, Image as ImageIcon, Video as VideoIcon, Globe as WebpageIcon, AlertCircle, CheckCircle, Loader2, XCircle, Eye, Info } from 'lucide-react'; // Añadido WebpageIcon
+import { 
+    PlusCircle, Edit3, Trash2, Link as LinkIcon, 
+    Image as ImageIcon, Video as VideoIcon, Globe as WebpageIcon, Palette as PixelMapIcon, // Renombrado Palette a PixelMapIcon para claridad
+    AlertCircle, CheckCircle, Loader2, XCircle, Eye, Info, Music, FileImage 
+} from 'lucide-react';
 
 // Modal Component (simple) - No necesita cambios
 const Modal = ({ isOpen, onClose, title, children }) => {
@@ -69,8 +73,8 @@ const ActivatorsPage = () => {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      setError(''); // Limpiar error al cargar datos
-      setSuccessMessage(''); // Limpiar mensaje de éxito
+      setError(''); 
+      setSuccessMessage(''); 
       await Promise.all([fetchActivators(), fetchMedia()]);
       setIsLoading(false);
     };
@@ -111,7 +115,6 @@ const ActivatorsPage = () => {
       let responseActivator;
       if (currentActivator) {
         responseActivator = await api.put(`/activators/${currentActivator._id}`, activatorData);
-        // Si la media asignada cambió, hacer una petición separada para asignarla
         if (assignedMedia !== (currentActivator.assignedMedia?._id || '') || (assignedMedia === '' && currentActivator.assignedMedia)) {
             await api.patch(`/activators/${currentActivator._id}/assign-media`, { mediaId: assignedMedia || null });
         }
@@ -150,13 +153,18 @@ const ActivatorsPage = () => {
   };
   
   const getVisualizerUrl = (vizId) => {
-    // Usar VITE_VISUALIZER_FRONTEND_URL si está disponible (para producción), sino un fallback.
-    // La URL base del frontend de visualización.
-    // Si tu admin y visualizador están en el mismo dominio `activate.scanmee.io`
-    // y el visualizador usa rutas como `/visualizer/:id`, entonces la base es `window.location.origin`
-    // o una variable de entorno si son dominios diferentes.
     const baseVisualizerUrl = import.meta.env.VITE_VISUALIZER_PAGE_BASE_URL || window.location.origin;
     return `${baseVisualizerUrl}/visualizer/${vizId}`;
+  };
+
+  const getMediaTypeDisplayName = (mediaType) => {
+    switch (mediaType) {
+      case 'image': return 'Imagen';
+      case 'video': return 'Video';
+      case 'webpage': return 'Página Web';
+      case 'pixelmap': return 'Pixel Map';
+      default: return 'Desconocido';
+    }
   };
 
   const renderMediaInfo = (media) => {
@@ -166,7 +174,8 @@ const ActivatorsPage = () => {
     if (media.mediaType === 'image') icon = <ImageIcon size={16} className="mr-1.5 text-blue-500 flex-shrink-0" />;
     else if (media.mediaType === 'video') icon = <VideoIcon size={16} className="mr-1.5 text-purple-500 flex-shrink-0" />;
     else if (media.mediaType === 'webpage') icon = <WebpageIcon size={16} className="mr-1.5 text-green-500 flex-shrink-0" />;
-    else icon = <ImageIcon size={16} className="mr-1.5 text-slate-400 flex-shrink-0" />;
+    else if (media.mediaType === 'pixelmap') icon = <PixelMapIcon size={16} className="mr-1.5 text-orange-500 flex-shrink-0" />;
+    else icon = <ImageIcon size={16} className="mr-1.5 text-slate-400 flex-shrink-0" />; // Icono por defecto
 
     return (
       <div className="flex items-center">
@@ -180,44 +189,23 @@ const ActivatorsPage = () => {
 
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-10">
-        <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
-        <p className="ml-3 text-slate-600">Cargando datos...</p>
-      </div>
-    );
+    return ( /* ... Contenido de carga ... */ <div className="flex justify-center items-center py-10"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /><p className="ml-3 text-slate-600">Cargando datos...</p></div>);
   }
 
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors"
-        >
-          <PlusCircle size={20} className="mr-2" />
-          Crear Nuevo Activador
+        <button onClick={() => handleOpenModal()} className="flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors">
+          <PlusCircle size={20} className="mr-2" />Crear Nuevo Activador
         </button>
       </div>
 
-      {error && !isModalOpen && (
-          <div className="my-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md flex items-center" role="alert">
-            <AlertCircle size={20} className="mr-3 text-red-500" /> <p className="text-sm">{error}</p>
-          </div>
-        )}
-      {successMessage && !isModalOpen && (
-        <div className="my-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md flex items-center" role="alert">
-          <CheckCircle size={20} className="mr-3 text-green-500" /> <p className="text-sm">{successMessage}</p>
-        </div>
-      )}
+      {error && !isModalOpen && ( <div className="my-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md flex items-center" role="alert"><AlertCircle size={20} className="mr-3 text-red-500" /> <p className="text-sm">{error}</p></div>)}
+      {successMessage && !isModalOpen && (<div className="my-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md flex items-center" role="alert"><CheckCircle size={20} className="mr-3 text-green-500" /> <p className="text-sm">{successMessage}</p></div>)}
 
       <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={currentActivator ? 'Editar Activador' : 'Crear Nuevo Activador'}>
         <form onSubmit={handleSubmitActivator} className="space-y-4">
-          {error && isModalOpen && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-md flex items-center text-sm" role="alert">
-              <AlertCircle size={18} className="mr-2 text-red-500 flex-shrink-0" /> {error}
-            </div>
-          )}
+          {error && isModalOpen && ( <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-md flex items-center text-sm" role="alert"><AlertCircle size={18} className="mr-2 text-red-500 flex-shrink-0" /> {error}</div>)}
           <div>
             <label htmlFor="activatorName" className="block text-sm font-medium text-slate-700">Nombre del Activador</label>
             <input type="text" id="activatorName" value={activatorName} onChange={(e) => setActivatorName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Ej: Pantalla Principal Lobby" />
@@ -232,12 +220,12 @@ const ActivatorsPage = () => {
             <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows="3" className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Describe brevemente este activador." />
           </div>
           <div>
-            <label htmlFor="assignedMedia" className="block text-sm font-medium text-slate-700">Asignar Multimedia (Opcional)</label>
+            <label htmlFor="assignedMedia" className="block text-sm font-medium text-slate-700">Asignar Contenido (Opcional)</label>
             <select id="assignedMedia" value={assignedMedia} onChange={(e) => setAssignedMedia(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
               <option value="">-- No asignar contenido --</option>
               {mediaItems.map(media => (
                 <option key={media._id} value={media._id}>
-                  {media.originalName} ({media.mediaType === 'webpage' ? 'Página Web' : media.mediaType}) {/* Muestra "Página Web" para el tipo webpage */}
+                  {media.originalName} ({getMediaTypeDisplayName(media.mediaType)}) {/* Usar getMediaTypeDisplayName */}
                 </option>
               ))}
             </select>
@@ -276,7 +264,7 @@ const ActivatorsPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-mono">{activator.visualizerId}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {renderMediaInfo(activator.assignedMedia)} {/* Usar la función renderMediaInfo */}
+                      {renderMediaInfo(activator.assignedMedia)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <a href={getVisualizerUrl(activator.visualizerId)} target="_blank" rel="noopener noreferrer" title={`Abrir ${getVisualizerUrl(activator.visualizerId)}`} className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
