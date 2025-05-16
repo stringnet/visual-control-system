@@ -1,163 +1,167 @@
 // backend/src/controllers/mediaController.js
 const asyncHandler = require('express-async-handler');
-const path = require('path'); // Útil para obtener el nombre base del archivo original
+const path = require('path');
 const Media = require('../models/Media');
 const Activator = require('../models/Activator');
-const { cloudinaryV2 } = require('../middleware/uploadMiddleware'); // Importamos la instancia configurada de cloudinaryV2
+const { cloudinaryV2 } = require('../middleware/uploadMiddleware');
 
-// Función helper para subir un stream/buffer a Cloudinary
-// Retorna una Promesa para poder usar async/await
 const uploadStreamToCloudinary = (fileBuffer, options) => {
     return new Promise((resolve, reject) => {
-        // Usamos upload_stream para enviar el buffer
         const uploadStream = cloudinaryV2.uploader.upload_stream(options, (error, result) => {
-            if (error) {
-                // Si hay un error durante la subida, rechazamos la promesa
-                return reject(error);
-            }
-            // Si la subida es exitosa, resolvemos la promesa con el resultado de Cloudinary
+            if (error) return reject(error);
             resolve(result);
         });
-        // Finalizamos el stream enviando el buffer del archivo
         uploadStream.end(fileBuffer);
     });
 };
 
-// @desc    Subir un nuevo archivo multimedia
+// @desc    Subir nuevo archivo multimedia o registrar URL de página web
 // @route   POST /api/media/upload
-// @access  Private/Admin (protegido por 'protect' y 'isAdmin' en las rutas)
+// @access  Private/Admin
 const uploadNewMedia = asyncHandler(async (req, res) => {
-    // Verificar si se subió un archivo. req.file es poblado por Multer.
-    if (!req.file) {
-        res.status(400); // Bad Request
-        throw new Error('Por favor, selecciona un archivo para subir.');
-    }
+    // Caso 1: Subida de archivo (imagen o video)
+    if (req.file) {
+        const { originalname, mimetype, buffer, size: originalSize } = req.file;
 
-    const { originalname, mimetype, buffer, size: originalSize } = req.file; // 'buffer' contiene los datos del archivo
-
-    // Verificar si Cloudinary está configurado (las variables de entorno deben estar presentes)
-    if (!process.env.CLOUDINARY_CLOUD_NAME) {
-        res.status(500); // Internal Server Error
-        throw new Error('Cloudinary no está configurado en el servidor. No se puede procesar la subida del archivo.');
-    }
-
-    try {
-        // Determinar la carpeta y el tipo de recurso para Cloudinary basado en el mimetype
-        let folderName = 'easypanel_media/otros'; // Carpeta por defecto
-        let resourceType = 'auto'; // Cloudinary intentará detectar el tipo
-
-        if (mimetype.startsWith('image/')) {
-            folderName = 'easypanel_media/imagenes';
-            resourceType = 'image';
-        } else if (mimetype.startsWith('video/')) {
-            folderName = 'easypanel_media/videos';
-            resourceType = 'video';
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+            res.status(500);
+            throw new Error('Cloudinary no está configurado en el servidor.');
         }
 
-        // Opciones para la subida a Cloudinary
-        const cloudinaryUploadOptions = {
-            folder: folderName,
-            resource_type: resourceType,
-            // Generar un public_id único usando el nombre original del archivo (sin extensión) y un timestamp
-            public_id: `${path.parse(originalname).name.replace(/[^a-zA-Z0-9_]/g, '_')}-${Date.now()}`,
-            // Podrías añadir más opciones aquí, como transformaciones 'eager'
-        };
+        try {
+            let folderName = 'easypanel_media/otros_archivos';
+            let resourceType = 'auto';
+            let detectedMediaType = '';
 
-        // Llamar a la función helper para subir el buffer a Cloudinary
-        const cloudinaryResult = await uploadStreamToCloudinary(buffer, cloudinaryUploadOptions);
+            if (mimetype.startsWith('image/')) {
+                folderName = 'easypanel_media/imagenes';
+                resourceType = 'image';
+                detectedMediaType = 'image';
+            } else if (mimetype.startsWith('video/')) {
+                folderName = 'easypanel_media/videos';
+                resourceType = 'video';
+                detectedMediaType = 'video';
+            } else {
+                res.status(400);
+                throw new Error('Tipo de archivo no soportado para subida directa. Solo imágenes o videos.');
+            }
 
-        // Crear el objeto de datos para guardar en MongoDB
+            const cloudinaryResult = await uploadStreamToCloudinary(buffer, {
+                folder: folderName,
+                resource_type: resourceType,
+                public_id: `${path.parse(originalname).name.replace(/[^a-zA-Z0-9_]/g, '_')}-${Date.now()}`,
+            });
+
+            const mediaData = {
+                originalName: originalname,
+                filename: cloudinaryResult.public_id,
+                url: cloudinaryResult.secure_url,
+                mimetype: mimetype,
+                mediaType: detectedMediaType,
+                size: cloudinaryResult.bytes || originalSize,
+                uploadedBy: req.user._id,
+                cloudinaryPublicId: cloudinaryResult.public_id,
+                cloudinaryResourceType: cloudinaryResult.resource_type,
+            };
+            const newMedia = await Media.create(mediaData);
+            return res.status(201).json({
+                message: 'Archivo subido exitosamente a Cloudinary.',
+                media: newMedia,
+            });
+
+        } catch (error) {
+            console.error("Error durante la subida del archivo a Cloudinary:", error);
+            res.status(500);
+            throw new Error(`Fallo al subir el archivo a Cloudinary: ${error.message || 'Error desconocido'}`);
+        }
+    } 
+    // Caso 2: Registro de URL de página web
+    else if (req.body.contentUrl && req.body.mediaTypeInput === 'webpage') {
+        const { contentUrl, webpageTitle } = req.body;
+
+        if (!contentUrl) {
+            res.status(400);
+            throw new Error('Se requiere la URL de la página web (contentUrl).');
+        }
+        // Validación simple de URL (puedes hacerla más robusta)
+        try {
+            new URL(contentUrl);
+        } catch (_) {
+            res.status(400);
+            throw new Error('La URL proporcionada no es válida.');
+        }
+
         const mediaData = {
-            originalName: originalname,
-            filename: cloudinaryResult.public_id,       // Usar el public_id de Cloudinary como 'filename'
-            url: cloudinaryResult.secure_url,          // Usar la secure_url de Cloudinary
-            mimetype: mimetype,
-            mediaType: resourceType === 'image' ? 'image' : (resourceType === 'video' ? 'video' : 'raw'),
-            size: cloudinaryResult.bytes || originalSize, // Usar el tamaño reportado por Cloudinary, o el original si no está disponible
-            uploadedBy: req.user._id,                  // ID del admin que subió el archivo
-            cloudinaryPublicId: cloudinaryResult.public_id,
-            cloudinaryResourceType: cloudinaryResult.resource_type,
+            originalName: webpageTitle || contentUrl, // Usar título si se proporciona, sino la URL
+            url: contentUrl,
+            mediaType: 'webpage',
+            uploadedBy: req.user._id,
+            // Los campos como filename, mimetype, size, cloudinaryPublicId, etc.,
+            // serán manejados por el pre-validate hook en el modelo Media.js
         };
 
-        // Guardar la información del archivo multimedia en la base de datos
         const newMedia = await Media.create(mediaData);
-
-        res.status(201).json({ // 201 Created
-            message: 'Archivo subido exitosamente a Cloudinary.',
+        return res.status(201).json({
+            message: 'Página web registrada exitosamente.',
             media: newMedia,
         });
-
-    } catch (error) {
-        console.error("Error durante la subida del archivo a Cloudinary:", error);
-        res.status(500); // Internal Server Error
-        // Proporcionar un mensaje de error más específico si es posible
-        throw new Error(`Fallo al subir el archivo a Cloudinary: ${error.message || 'Error desconocido'}`);
+    } 
+    // Caso 3: No se proporcionó ni archivo ni URL válida para webpage
+    else {
+        res.status(400);
+        throw new Error('Por favor, selecciona un archivo para subir o proporciona una URL para una página web.');
     }
 });
 
-// @desc    Obtener todos los archivos multimedia (para el panel de admin)
-// @route   GET /api/media
-// @access  Private/Admin
+// ... (resto de las funciones: getAllUploadedMedia, getMediaDetailsById, deleteMediaFile)
+// La función deleteMediaFile no necesita cambios importantes, ya que si es 'webpage',
+// no tendrá cloudinaryPublicId y simplemente borrará la entrada de la base de datos.
+
 const getAllUploadedMedia = asyncHandler(async (req, res) => {
     const mediaItems = await Media.find({})
-        .populate('uploadedBy', 'username') // Mostrar el nombre de usuario del admin que subió
-        .sort({ createdAt: -1 }); // Los más recientes primero
+        .populate('uploadedBy', 'username')
+        .sort({ createdAt: -1 });
     res.status(200).json(mediaItems);
 });
 
-// @desc    Obtener un archivo multimedia por su ID
-// @route   GET /api/media/:id
-// @access  Private (Admin o Viewer, según se necesite en las rutas)
 const getMediaDetailsById = asyncHandler(async (req, res) => {
     const media = await Media.findById(req.params.id).populate('uploadedBy', 'username');
     if (!media) {
-        res.status(404); // Not Found
+        res.status(404);
         throw new Error('Archivo multimedia no encontrado.');
     }
     res.status(200).json(media);
 });
 
-// @desc    Eliminar un archivo multimedia
-// @route   DELETE /api/media/:id
-// @access  Private/Admin
 const deleteMediaFile = asyncHandler(async (req, res) => {
     const media = await Media.findById(req.params.id);
 
     if (!media) {
-        res.status(404); // Not Found
-        throw new Error('Archivo multimedia no encontrado.');
+        res.status(404);
+        throw new Error('Contenido multimedia no encontrado.');
     }
 
-    // Si el archivo tiene un cloudinaryPublicId, intentar eliminarlo de Cloudinary
-    if (media.cloudinaryPublicId && process.env.CLOUDINARY_CLOUD_NAME) {
+    if (media.mediaType !== 'webpage' && media.cloudinaryPublicId && process.env.CLOUDINARY_CLOUD_NAME) {
         try {
-            // Usar la API de Cloudinary para eliminar el recurso
             await cloudinaryV2.uploader.destroy(media.cloudinaryPublicId, {
                 resource_type: media.cloudinaryResourceType || (media.mediaType === 'video' ? 'video' : 'image')
             });
             console.log(`Media eliminada de Cloudinary: ${media.cloudinaryPublicId}`);
         } catch (error) {
             console.error(`Error al eliminar media de Cloudinary (${media.cloudinaryPublicId}):`, error.message);
-            // Considerar si se debe continuar o devolver un error.
-            // Por ahora, se registrará el error y se continuará con la eliminación de la DB.
-            // En un sistema de producción, podrías querer reintentar o marcar el archivo para borrado manual.
         }
     }
-    // Ya no hay lógica para borrar archivos locales, ya que todo se asume que está en Cloudinary.
 
-    // Desasignar esta media de cualquier activador que la esté usando
-    // Esto evita que los activadores apunten a media que ya no existe.
     await Activator.updateMany(
         { assignedMedia: media._id },
         { $set: { assignedMedia: null } }
     );
-    // Considera emitir un evento de Socket.IO aquí para los visualizadores afectados por la desasignación.
 
-    // Finalmente, eliminar la referencia del archivo multimedia de la base de datos
     await Media.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({ message: 'Archivo multimedia eliminado de Cloudinary y de la base de datos exitosamente.' });
+    res.status(200).json({ message: 'Contenido multimedia eliminado exitosamente.' });
 });
+
 
 module.exports = {
     uploadNewMedia,
