@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../services/api';
 import io from 'socket.io-client';
-import { Maximize, Image as ImageIcon, Video as VideoIcon, Globe as WebpageIcon, WifiOff, Loader2, AlertTriangle, VolumeX, Volume2, PlayCircle } from 'lucide-react'; // Añadido WebpageIcon
+import { Maximize, Image as ImageIcon, Video as VideoIcon, Globe as WebpageIcon, WifiOff, Loader2, AlertTriangle, VolumeX, Volume2, PlayCircle } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:3001';
 
@@ -12,6 +12,9 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
   const [isMuted, setIsMuted] = useState(true);
   const [showPlayButton, setShowPlayButton] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
+
+  // Log para depuración
+  console.log("FullScreenMedia props:", { mediaUrl, mediaType });
 
   useEffect(() => {
     if (mediaType === 'video' && videoRef.current) {
@@ -111,7 +114,7 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
             </button>
           )}
 
-          {videoRef.current && !showPlayButton && ( // Mostrar control de volumen si el video está listo y no hay botón de play grande
+          {videoRef.current && !showPlayButton && (
             <button
               onClick={toggleMute}
               className="absolute bottom-4 right-4 bg-black bg-opacity-60 text-white p-3 rounded-full hover:bg-opacity-80 transition-opacity z-20"
@@ -126,12 +129,12 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
         <iframe
           src={mediaUrl}
           title="Contenido de Página Web"
-          className="w-full h-full border-0" // Ocupa todo el espacio, sin bordes
-          // sandbox="allow-scripts allow-same-origin allow-popups allow-forms" // Opcional: para seguridad, ajusta según necesites
-          // allowFullScreen // Opcional
+          className="w-full h-full border-0 bg-white" // Añadido bg-white para ver si el iframe se renderiza
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-top-navigation allow-top-navigation-by-user-activation" // Permisos más amplios para prueba
+          allowFullScreen
+          onLoad={() => console.log("Iframe cargado:", mediaUrl)}
           onError={(e) => {
             console.error("Error al cargar la página web en el iframe:", mediaUrl, e);
-            // Podrías mostrar un mensaje de error dentro del iframe o en un overlay
           }}
         >
           Tu navegador no soporta iframes o el contenido no pudo ser cargado.
@@ -157,8 +160,10 @@ const VisualizerDisplayPage = () => {
       try {
         const response = await api.get(`/activators/content/${visualizerId}`);
         if (response.data && response.data.mediaContent) {
+          console.log("Contenido inicial recibido del backend:", response.data.mediaContent); // Log para depuración
           setMediaContent(response.data.mediaContent);
         } else {
+          console.log("No se recibió mediaContent o está vacío:", response.data); // Log para depuración
           setMediaContent(null);
         }
       } catch (err) {
@@ -193,13 +198,11 @@ const VisualizerDisplayPage = () => {
     socket.on('connect_error', (err) => {
         console.error(`Error de conexión Socket.IO: ${err.message}`);
         setSocketConnected(false);
-        // Ya no establecemos el error general aquí para no interferir con el error de carga de contenido
-        // setError(`Error de conexión en tiempo real: ${err.message}. Intentando reconectar...`);
     });
     
     socket.on('contentUpdate', (data) => {
       if (data.visualizerId === visualizerId) {
-        console.log('Actualización de contenido recibida:', data.mediaContent);
+        console.log('Actualización de contenido recibida por socket:', data.mediaContent); // Log para depuración
         setMediaContent(data.mediaContent);
         setError('');
       }
