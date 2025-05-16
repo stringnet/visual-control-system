@@ -1,43 +1,37 @@
 // admin-frontend/src/pages/VisualizerDisplayPage.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import api from '../services/api'; // Nuestro servicio API
-import io from 'socket.io-client'; // Cliente de Socket.IO
-import { Maximize, Image as ImageIcon, Video as VideoIcon, WifiOff, Loader2, AlertTriangle, VolumeX, Volume2, PlayCircle } from 'lucide-react';
+import api from '../services/api';
+import io from 'socket.io-client';
+import { Maximize, Image as ImageIcon, Video as VideoIcon, Globe as WebpageIcon, WifiOff, Loader2, AlertTriangle, VolumeX, Volume2, PlayCircle } from 'lucide-react'; // Añadido WebpageIcon
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:3001';
 
 const FullScreenMedia = ({ mediaUrl, mediaType }) => {
   const videoRef = useRef(null);
-  const [isMuted, setIsMuted] = useState(true); // Empezar silenciado para mejorar chances de autoplay visual
+  const [isMuted, setIsMuted] = useState(true);
   const [showPlayButton, setShowPlayButton] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
 
   useEffect(() => {
     if (mediaType === 'video' && videoRef.current) {
       const videoElement = videoRef.current;
-      videoElement.load(); // Recargar si la fuente cambia
+      videoElement.load(); 
 
       const playPromise = videoElement.play();
       if (playPromise !== undefined) {
         playPromise.then(() => {
-          // Autoplay visual (probablemente silenciado) comenzó exitosamente.
-          setShowPlayButton(false); // Ocultar botón de play si el autoplay visual funciona
-          // Si queríamos audio desde el inicio y no está silenciado, aquí estaría sonando.
-          // Si está silenciado, el usuario necesitará interactuar para desilenciar.
+          setShowPlayButton(false);
         }).catch(error => {
           console.warn("Video autoplay visual fue prevenido o falló:", error.message);
-          // Autoplay falló, mostrar un botón de play para que el usuario inicie.
           setShowPlayButton(true);
-          setIsMuted(false); // Preparar para reproducir con sonido cuando el usuario haga clic
+          setIsMuted(false); 
         });
       }
     }
-    // Resetear estados si la URL o tipo cambian
     return () => {
         setShowPlayButton(false);
         setUserInteracted(false);
-        // No cambiamos isMuted aquí para que persista la elección del usuario si es posible
     };
   }, [mediaUrl, mediaType]);
 
@@ -50,7 +44,6 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
         setUserInteracted(true);
       }).catch(error => {
         console.error("Error al intentar reproducir con sonido tras interacción:", error);
-        // Podría ser necesario otro tipo de interacción o el navegador sigue bloqueando.
       });
     }
   };
@@ -59,8 +52,8 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
     if (videoRef.current) {
       videoRef.current.muted = !videoRef.current.muted;
       setIsMuted(videoRef.current.muted);
-      setUserInteracted(true); // El usuario ha interactuado
-      setShowPlayButton(false); // Si desilencia, asumimos que quiere que siga reproduciendo
+      setUserInteracted(true);
+      setShowPlayButton(false); 
     }
   };
 
@@ -92,16 +85,13 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
           <video
             ref={videoRef}
             src={mediaUrl}
-            autoPlay // Intentar autoplay
+            autoPlay
             loop
-            playsInline // Necesario para iOS
-            muted={isMuted && !userInteracted} // Empezar silenciado, pero si el usuario interactuó, respetar su elección
+            playsInline
+            muted={isMuted && !userInteracted}
             className="max-w-full max-h-full object-contain"
-            onClick={mediaType === 'video' ? toggleMute : undefined} // Permitir tocar el video para (des)silenciar
+            onClick={toggleMute}
             onPlay={() => {
-                // Si el video comienza a reproducirse (incluso silenciado),
-                // y el usuario aún no ha interactuado para el sonido,
-                // podríamos mantener el botón de desilenciar si está silenciado.
                 if(videoRef.current && videoRef.current.muted) setIsMuted(true); else setIsMuted(false);
             }}
             onError={(e) => {
@@ -121,8 +111,7 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
             </button>
           )}
 
-          {/* Botón para (des)silenciar si el video se está reproduciendo y el usuario ya interactuó o si no hay botón de play */}
-          {mediaType === 'video' && videoRef.current && !showPlayButton && (
+          {videoRef.current && !showPlayButton && ( // Mostrar control de volumen si el video está listo y no hay botón de play grande
             <button
               onClick={toggleMute}
               className="absolute bottom-4 right-4 bg-black bg-opacity-60 text-white p-3 rounded-full hover:bg-opacity-80 transition-opacity z-20"
@@ -132,6 +121,21 @@ const FullScreenMedia = ({ mediaUrl, mediaType }) => {
             </button>
           )}
         </>
+      )}
+      {mediaType === 'webpage' && (
+        <iframe
+          src={mediaUrl}
+          title="Contenido de Página Web"
+          className="w-full h-full border-0" // Ocupa todo el espacio, sin bordes
+          // sandbox="allow-scripts allow-same-origin allow-popups allow-forms" // Opcional: para seguridad, ajusta según necesites
+          // allowFullScreen // Opcional
+          onError={(e) => {
+            console.error("Error al cargar la página web en el iframe:", mediaUrl, e);
+            // Podrías mostrar un mensaje de error dentro del iframe o en un overlay
+          }}
+        >
+          Tu navegador no soporta iframes o el contenido no pudo ser cargado.
+        </iframe>
       )}
     </div>
   );
@@ -189,7 +193,8 @@ const VisualizerDisplayPage = () => {
     socket.on('connect_error', (err) => {
         console.error(`Error de conexión Socket.IO: ${err.message}`);
         setSocketConnected(false);
-        setError(`Error de conexión en tiempo real: ${err.message}. Intentando reconectar...`);
+        // Ya no establecemos el error general aquí para no interferir con el error de carga de contenido
+        // setError(`Error de conexión en tiempo real: ${err.message}. Intentando reconectar...`);
     });
     
     socket.on('contentUpdate', (data) => {
@@ -218,7 +223,7 @@ const VisualizerDisplayPage = () => {
           <p className="text-lg text-slate-300">Cargando visualizador: {visualizerId}...</p>
         </div>
       )}
-      {!isLoading && error && !mediaContent && ( // Mostrar error solo si no hay mediaContent
+      {!isLoading && error && !mediaContent && (
          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-10 p-8 text-center">
           <AlertTriangle size={48} className="text-red-500 mb-4" />
           <p className="text-xl text-red-400 mb-2">Error al Cargar Contenido</p>
