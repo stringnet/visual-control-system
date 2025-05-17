@@ -396,58 +396,72 @@ function actualizarVisualesConBeat(datosDelBeat) {
 
 // --- Ciclo de Vida del Componente y Observadores ---
 onMounted(() => {
-  console.log("[DBUG] onMounted - Componente montado."); 
+  console.log("[DBUG_ONMOUNTED_START] Componente montado. Iniciando lógica de onMounted."); 
   pixelRefs.value = []; 
   
-  const activatorIdFromPath = window.location.pathname.split('/').pop() || 'default'; 
-  console.log("[DBUG] onMounted - activatorIdFromPath determinado:", activatorIdFromPath); 
+  let activatorIdFromPath = 'default'; 
+  try {
+    activatorIdFromPath = window.location.pathname.split('/').pop() || 'default'; 
+    console.log("[DBUG_ONMOUNTED_ACTIVATOR_ID] activatorIdFromPath determinado:", activatorIdFromPath); 
+  } catch (e) {
+    console.error("[DBUG_ONMOUNTED_ACTIVATOR_ID_ERROR] Error obteniendo activatorIdFromPath:", e);
+  }
   
   const SOCKET_SERVER_URL = 'wss://activate.scanmee.io'; 
-  console.log("[DBUG] onMounted - URL del servidor WebSocket:", SOCKET_SERVER_URL); 
+  console.log("[DBUG_ONMOUNTED_SOCKET_URL] URL del servidor WebSocket:", SOCKET_SERVER_URL); 
   
   if (socket && socket.connected) {
-      console.log("[DBUG] onMounted - Socket ya conectado. Posiblemente HMR o remontaje rápido."); 
+      console.log("[DBUG_ONMOUNTED_SOCKET_CHECK] Socket ya conectado. Posiblemente HMR o remontaje rápido."); 
   } else {
-      socket = io(SOCKET_SERVER_URL, {});
-      console.log("[DBUG] onMounted - Nueva instancia de socket creada."); 
+      try {
+        socket = io(SOCKET_SERVER_URL, {});
+        console.log("[DBUG_ONMOUNTED_SOCKET_INSTANCE] Nueva instancia de socket creada."); 
+      } catch (e) {
+        console.error("[DBUG_ONMOUNTED_SOCKET_INSTANCE_ERROR] Error creando instancia de socket:", e);
+        return; 
+      }
   }
 
-  console.log("[DBUG] onMounted - Registrando listeners de socket..."); 
+  console.log("[DBUG_ONMOUNTED_REG_LISTENERS] Registrando listeners de socket..."); 
+  
   socket.on('connect', () => {
-    try { // NUEVO TRY-CATCH
-      console.log(`[DBUG] Socket conectado con ID: ${socket.id}`); 
+    console.log("[DBUG_SOCKET_ON_CONNECT_START] Entrando al callback de 'connect'."); 
+    try { 
+      console.log(`[DBUG_SOCKET_ON_CONNECT_ID] Socket conectado con ID: ${socket.id}`); 
       musicStatusMessage.value = `Conectado. Esperando datos para sala: ${activatorIdFromPath}`;
       
-      if (activatorIdFromPath && activatorIdFromPath !== 'default') {
+      console.log(`[DBUG_SOCKET_ON_CONNECT_PRE_JOIN] Verificando activatorIdFromPath antes de joinRoom. Valor: '${activatorIdFromPath}'`); 
+      if (activatorIdFromPath && activatorIdFromPath !== 'default' && activatorIdFromPath.trim() !== '') { 
         socket.emit('joinRoom', activatorIdFromPath); 
-        console.log(`[DBUG] Emitiendo 'joinRoom' para la sala: ${activatorIdFromPath}`); 
+        console.log(`[DBUG_SOCKET_ON_CONNECT_EMIT_JOIN] Emitiendo 'joinRoom' para la sala: ${activatorIdFromPath}`); 
       } else {
-        console.warn("[DBUG] 'joinRoom' no emitido: activatorIdFromPath es inválido o 'default'. Valor:", activatorIdFromPath);
+        console.warn(`[DBUG_SOCKET_ON_CONNECT_NO_JOIN] 'joinRoom' no emitido: activatorIdFromPath es inválido o 'default'. Valor actual: '${activatorIdFromPath}'`);
       }
     } catch (error) {
-      console.error("[DBUG] Error dentro del callback socket.on('connect'):", error);
+      console.error("[DBUG_SOCKET_ON_CONNECT_ERROR_CALLBACK] Error dentro del callback socket.on('connect'):", error);
     }
+    console.log("[DBUG_SOCKET_ON_CONNECT_END] Saliendo del callback de 'connect'."); 
   });
 
   socket.on('disconnect', (reason) => {
-    console.warn(`[DBUG] Socket desconectado: ${reason}`); 
+    console.warn(`[DBUG_SOCKET_ON_DISCONNECT] Socket desconectado: ${reason}`); 
     musicStatusMessage.value = "Desconectado del servidor de actualizaciones.";
   });
 
   socket.on('connect_error', (error) => {
-    console.error('[DBUG] Error de conexión WebSocket:', error); 
+    console.error('[DBUG_SOCKET_ON_CONNECT_ERROR] Error de conexión WebSocket:', error); 
     musicStatusMessage.value = "Error al conectar con el servidor de actualizaciones.";
   });
 
   socket.on('contentUpdate', (data) => {
-    console.log("[DBUG] Evento 'contentUpdate' recibido del servidor:", data); 
+    console.log("[DBUG_SOCKET_ON_CONTENT_UPDATE] Evento 'contentUpdate' recibido del servidor:", data); 
     processPixelArtData(data);
   });
-  console.log("[DBUG] onMounted - Listeners de socket registrados."); 
+  console.log("[DBUG_ONMOUNTED_LISTENERS_REGISTERED] Listeners de socket registrados."); 
 });
 
 onUnmounted(() => {
-  console.log("[DBUG] onUnmounted - Desmontando componente..."); 
+  console.log("[DBUG_ONMOUNTED_START] Desmontando componente..."); // Corregido: Debería ser ONUNMOUNTED_START
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
   }
@@ -462,7 +476,7 @@ onUnmounted(() => {
     audioContext = null; 
   }
   if (socket) {
-    console.log("[DBUG] onUnmounted - Desconectando socket..."); 
+    console.log("[DBUG_ONUNMOUNTED_SOCKET_DISCONNECT] Desconectando socket..."); // Corregido
     socket.disconnect();
     socket = null; 
   }
