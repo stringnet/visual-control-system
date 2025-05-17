@@ -85,9 +85,10 @@ let socket = null;
 
 // 1. PROCESAMIENTO DE DATOS DEL PIXEL ART RECIBIDOS DEL BACKEND
 function processPixelArtData(receivedContent) {
+  console.log("[DBUG] processPixelArtData - Datos recibidos:", receivedContent); // NUEVO LOG
   if (!receivedContent || receivedContent.mediaType !== 'pixelmap' || !receivedContent.pixelMapConfig) {
     musicStatusMessage.value = "Datos del Pixel Map inválidos o no recibidos.";
-    console.error("Datos del Pixel Map inválidos:", receivedContent);
+    console.error("[DBUG] processPixelArtData - Datos del Pixel Map inválidos:", receivedContent); // Log de error mejorado
     pixels.value = []; 
     logoUrl.value = '';
     audioUrlFromData.value = '';
@@ -97,18 +98,20 @@ function processPixelArtData(receivedContent) {
   const config = receivedContent.pixelMapConfig;
   
   musicStatusMessage.value = `Configurando: ${receivedContent.originalName || 'Pixel Map'}`;
+  console.log(`[DBUG] processPixelArtData - Configurando para: ${receivedContent.originalName || 'Pixel Map'}`); // NUEVO LOG
   
   pixelArtData.value = receivedContent; 
   pixelArtName.value = receivedContent.originalName || 'Pixel Map sin nombre';
   logoUrl.value = config.logoUrl || '';
   audioUrlFromData.value = config.audioUrl || '';
 
-  const numGridRows = 10; // O obtén esto del backend si es configurable
-  const numGridCols = 10; // O obtén esto del backend si es configurable
+  const numGridRows = 10; 
+  const numGridCols = 10; 
   const totalPixelsInGrid = numGridRows * numGridCols;
   const newPixelsArray = [];
 
   if (config.colors && config.colors.length > 0) {
+    console.log("[DBUG] processPixelArtData - Usando colores del backend:", config.colors); // NUEVO LOG
     for (let i = 0; i < totalPixelsInGrid; i++) {
       const colorFromBackend = config.colors[i % config.colors.length];
       newPixelsArray.push({
@@ -122,7 +125,7 @@ function processPixelArtData(receivedContent) {
       });
     }
   } else {
-    console.warn("No se proporcionaron colores en pixelMapConfig. Creando píxeles con color por defecto.");
+    console.warn("[DBUG] processPixelArtData - No se proporcionaron colores en pixelMapConfig. Creando píxeles con color por defecto."); // Log de advertencia mejorado
     for (let i = 0; i < totalPixelsInGrid; i++) {
       const defaultColor = '#333333';
       newPixelsArray.push({
@@ -137,13 +140,16 @@ function processPixelArtData(receivedContent) {
     }
   }
   pixels.value = newPixelsArray;
+  console.log("[DBUG] processPixelArtData - Píxeles procesados:", pixels.value.length); // NUEVO LOG
 
   if (audioUrlFromData.value) {
+    console.log("[DBUG] processPixelArtData - URL de audio encontrada, inicializando sincronización:", audioUrlFromData.value); // NUEVO LOG
     nextTick().then(() => { 
       initializeAudioSynchronization();
     });
   } else {
     musicStatusMessage.value = "No hay audio configurado para este Pixel Map.";
+    console.warn("[DBUG] processPixelArtData - No hay audioUrlFromData para este Pixel Map."); // NUEVO LOG
   }
 }
 
@@ -193,8 +199,10 @@ const setPixelRef = (el, index) => {
 
 // 3. Lógica de Sincronización de Audio
 function initializeAudioSynchronization() {
+  console.log("[DBUG] initializeAudioSynchronization - Iniciando..."); // NUEVO LOG
   if (!audioUrlFromData.value || !audioPlayerElementRef.value) {
     musicStatusMessage.value = "Falta URL de audio o reproductor no está listo.";
+    console.error("[DBUG] initializeAudioSynchronization - Falta URL de audio o reproductor no está listo."); // NUEVO LOG
     return;
   }
 
@@ -205,8 +213,9 @@ function initializeAudioSynchronization() {
       analyserNode.fftSize = 256; 
       const bufferLength = analyserNode.frequencyBinCount; 
       frequencyDataArray = new Uint8Array(bufferLength); 
+      console.log("[DBUG] initializeAudioSynchronization - AudioContext y Analyser creados."); // NUEVO LOG
     } catch (e) {
-      console.error("Error inicializando Web Audio API:", e);
+      console.error("[DBUG] initializeAudioSynchronization - Error inicializando Web Audio API:", e); // Log de error mejorado
       musicStatusMessage.value = "Error: Web Audio API no disponible o bloqueada.";
       return;
     }
@@ -214,12 +223,14 @@ function initializeAudioSynchronization() {
 
   audioPlayerElementRef.value.src = audioUrlFromData.value;
   audioPlayerElementRef.value.crossOrigin = "anonymous"; 
+  console.log("[DBUG] initializeAudioSynchronization - src del audioPlayer seteado:", audioUrlFromData.value); // NUEVO LOG
 
   const setupAndPlay = () => {
+    console.log("[DBUG] initializeAudioSynchronization - setupAndPlay - Estado del AudioContext:", audioContext.state); // NUEVO LOG
     if (audioContext.state === 'suspended') {
       audioContext.resume().then(actuallySetupAndPlay).catch(e => {
         musicStatusMessage.value = "Haz clic en el visualizador para activar audio.";
-        console.warn("Reanudar AudioContext falló, esperando interacción del usuario.", e);
+        console.warn("[DBUG] initializeAudioSynchronization - Reanudar AudioContext falló, esperando interacción del usuario.", e); // Log de advertencia mejorado
       });
     } else {
       actuallySetupAndPlay();
@@ -227,6 +238,7 @@ function initializeAudioSynchronization() {
   };
 
   const actuallySetupAndPlay = () => {
+    console.log("[DBUG] initializeAudioSynchronization - actuallySetupAndPlay - Iniciando configuración de nodos."); // NUEVO LOG
     if (mediaElementSourceNode) { 
       mediaElementSourceNode.disconnect();
     }
@@ -234,58 +246,69 @@ function initializeAudioSynchronization() {
       mediaElementSourceNode = audioContext.createMediaElementSource(audioPlayerElementRef.value);
       mediaElementSourceNode.connect(analyserNode);
       analyserNode.connect(audioContext.destination); 
+      console.log("[DBUG] initializeAudioSynchronization - Nodos de audio conectados."); // NUEVO LOG
 
       audioPlayerElementRef.value.play().then(() => {
         musicStatusMessage.value = "¡Sincronizando con la música!";
+        console.log("[DBUG] initializeAudioSynchronization - Reproducción de audio iniciada."); // NUEVO LOG
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
         renderMusicVisualizationFrame();
       }).catch(e => {
-        console.error("Error al reproducir audio:", e);
+        console.error("[DBUG] initializeAudioSynchronization - Error al reproducir audio:", e); // Log de error mejorado
         musicStatusMessage.value = "Error al reproducir. Verifica la URL/formato del audio.";
       });
     } catch (error) {
-      console.error("Error configurando fuente de audio:", error);
+      console.error("[DBUG] initializeAudioSynchronization - Error configurando fuente de audio:", error); // Log de error mejorado
       musicStatusMessage.value = "Error al iniciar análisis de audio.";
     }
   };
   
   const attemptToPlayAudio = () => {
+     console.log("[DBUG] initializeAudioSynchronization - attemptToPlayAudio - Estado del AudioContext:", audioContext ? audioContext.state : "null", "Player readyState:", audioPlayerElementRef.value ? audioPlayerElementRef.value.readyState : "null"); // NUEVO LOG
      if (audioContext && audioPlayerElementRef.value && audioPlayerElementRef.value.src) { 
         if (audioContext.state === 'running') {
             if (audioPlayerElementRef.value.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) { 
                 setupAndPlay();
             } else {
+                console.log("[DBUG] initializeAudioSynchronization - Audio no listo (readyState < HAVE_ENOUGH_DATA), esperando 'canplaythrough'."); // NUEVO LOG
                 audioPlayerElementRef.value.addEventListener('canplaythrough', setupAndPlay, { once: true });
             }
         } else { 
             musicStatusMessage.value = "Audio pausado. Haz clic en el visualizador para iniciar.";
+            console.log("[DBUG] initializeAudioSynchronization - AudioContext no está 'running', esperando interacción."); // NUEVO LOG
         }
+     } else {
+        console.warn("[DBUG] initializeAudioSynchronization - attemptToPlayAudio - Condiciones no cumplidas (audioContext, player o src faltantes)."); // NUEVO LOG
      }
   };
   
   audioPlayerElementRef.value.addEventListener('error', (e) => {
-    console.error("Error en elemento <audio>:", e);
+    console.error("[DBUG] initializeAudioSynchronization - Error en elemento <audio>:", e); // Log de error mejorado
     musicStatusMessage.value = "Error cargando archivo de audio. Verifica la URL y CORS.";
   });
   
    if (audioPlayerElementRef.value.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) { 
         attemptToPlayAudio();
     } else {
+        console.log("[DBUG] initializeAudioSynchronization - Audio no listo inicialmente, esperando 'canplaythrough'."); // NUEVO LOG
         audioPlayerElementRef.value.addEventListener('canplaythrough', attemptToPlayAudio, { once: true });
     }
 }
 
 function handleUserInteraction() {
+  console.log("[DBUG] handleUserInteraction - Interacción detectada."); // NUEVO LOG
   if (audioContext && audioContext.state === 'suspended') {
-    console.log("Interacción del usuario detectada, intentando reanudar AudioContext.");
+    console.log("[DBUG] handleUserInteraction - AudioContext suspendido, intentando reanudar."); // NUEVO LOG
     audioContext.resume().then(() => {
       musicStatusMessage.value = "Audio activado.";
+      console.log("[DBUG] handleUserInteraction - AudioContext reanudado."); // NUEVO LOG
       if (audioPlayerElementRef.value && audioPlayerElementRef.value.paused && audioPlayerElementRef.value.src) {
          initializeAudioSynchronization(); 
       }
-    }).catch(e => console.error("Error reanudando AudioContext tras interacción:", e));
+    }).catch(e => console.error("[DBUG] handleUserInteraction - Error reanudando AudioContext tras interacción:", e)); // Log de error mejorado
   } else if (audioContext && audioPlayerElementRef.value && audioPlayerElementRef.value.paused && audioPlayerElementRef.value.src) {
-    audioPlayerElementRef.value.play().catch(e => console.error("Error al reproducir tras interacción:", e));
+    console.log("[DBUG] handleUserInteraction - AudioContext corriendo, audio pausado. Intentando reproducir."); // NUEVO LOG
+    audioPlayerElementRef.value.play().catch(e => console.error("[DBUG] handleUserInteraction - Error al reproducir tras interacción:", e)); // Log de error mejorado
   }
 }
 
@@ -313,6 +336,8 @@ function renderMusicVisualizationFrame() {
   const currentTime = Date.now();
   if (bassEnergy > currentBeatThreshold && (currentTime - lastBeatTimestamp) > BEAT_COOLDOWN_MS) {
     lastBeatTimestamp = currentTime;
+    // console.log(`[DBUG] Beat detectado! Energía: ${bassEnergy.toFixed(2)}`); // Log de beat (puede ser muy verboso)
+
 
     let beatColorIndex; 
     do {
@@ -371,84 +396,49 @@ function actualizarVisualesConBeat(datosDelBeat) {
 
 // --- Ciclo de Vida del Componente y Observadores ---
 onMounted(() => {
+  console.log("[DBUG] onMounted - Componente montado."); // NUEVO LOG
   pixelRefs.value = []; 
   
   const activatorIdFromPath = window.location.pathname.split('/').pop() || 'default'; 
+  console.log("[DBUG] onMounted - activatorIdFromPath determinado:", activatorIdFromPath); // NUEVO LOG
   
-  // --- INICIO: Lógica de WebSocket ---
-  // Asegúrate que la URL del servidor WebSocket sea correcta.
-  // Si tu backend está en el mismo host/puerto, esto podría funcionar:
-  // const SOCKET_SERVER_URL = window.location.origin; 
-  // O especifica la URL completa si es diferente:
-  const SOCKET_SERVER_URL = 'wss://activate.scanmee.io'; // O 'ws://localhost:PORT' para desarrollo local si tu backend corre en otro puerto
-                                                       // Reemplaza con la URL real de tu servidor WebSocket
+  const SOCKET_SERVER_URL = 'wss://activate.scanmee.io'; 
+  console.log("[DBUG] onMounted - URL del servidor WebSocket:", SOCKET_SERVER_URL); // NUEVO LOG
   
-  // Verificar si ya existe una conexión para evitar duplicados si el componente se remonta rápidamente (aunque onUnmounted debería manejarlo)
   if (socket && socket.connected) {
-      console.log("Socket ya conectado.");
+      console.log("[DBUG] onMounted - Socket ya conectado. Posiblemente HMR o remontaje rápido."); // NUEVO LOG
   } else {
-      socket = io(SOCKET_SERVER_URL, {
-          // Opciones de Socket.io si las necesitas, por ejemplo, para reconexión, transportes, etc.
-          // transports: ['websocket'], // Forzar websocket si es necesario
-          // query: { token: 'tu_token_de_autenticacion_si_es_necesario_para_la_conexion' } // Si necesitas enviar un token al conectar
-      });
+      socket = io(SOCKET_SERVER_URL, {});
+      console.log("[DBUG] onMounted - Nueva instancia de socket creada."); // NUEVO LOG
   }
 
-
+  console.log("[DBUG] onMounted - Registrando listeners de socket..."); // NUEVO LOG
   socket.on('connect', () => {
-    console.log(`Socket conectado con ID: ${socket.id}`);
+    console.log(`[DBUG] Socket conectado con ID: ${socket.id}`); // Log de conexión mejorado
     musicStatusMessage.value = `Conectado. Esperando datos para sala: ${activatorIdFromPath}`;
-    // Unirse a la sala específica del activador
     socket.emit('joinRoom', activatorIdFromPath); 
-    console.log(`Emitiendo 'joinRoom' para la sala: ${activatorIdFromPath}`);
+    console.log(`[DBUG] Emitiendo 'joinRoom' para la sala: ${activatorIdFromPath}`); // Log de emisión mejorado
   });
 
   socket.on('disconnect', (reason) => {
-    console.log(`Socket desconectado: ${reason}`);
+    console.warn(`[DBUG] Socket desconectado: ${reason}`); // Log de desconexión mejorado
     musicStatusMessage.value = "Desconectado del servidor de actualizaciones.";
   });
 
   socket.on('connect_error', (error) => {
-    console.error('Error de conexión WebSocket:', error);
+    console.error('[DBUG] Error de conexión WebSocket:', error); // Log de error mejorado
     musicStatusMessage.value = "Error al conectar con el servidor de actualizaciones.";
   });
 
-  // Escuchar el evento 'contentUpdate' que emite tu backend
   socket.on('contentUpdate', (data) => {
-    // El log del backend muestra que 'data' es el objeto completo
-    // { mediaType: 'pixelmap', pixelMapConfig: {...}, originalName: 'Vixionfest' }
-    // No necesitas data.content a menos que el backend anide el contenido.
-    // Basado en tu log: "Evento 'contentUpdate' emitido a sala activate02 con contenido: { EL_OBJETO }"
-    // Entonces 'data' ya es el objeto de contenido.
-    console.log("Evento 'contentUpdate' recibido del servidor:", data);
-    // Podrías añadir una comprobación para asegurar que es para el activador correcto si el servidor no filtra por sala
-    // if (data.activatorId === activatorIdFromPath) { // Si el backend no anida activatorId en el payload del evento
-         processPixelArtData(data);
-    // }
+    console.log("[DBUG] Evento 'contentUpdate' recibido del servidor:", data); // Log de recepción mejorado
+    processPixelArtData(data);
   });
-  // --- FIN: Lógica de WebSocket ---
-
-  // La simulación de datos ya no es necesaria si WebSocket funciona.
-  // Puedes comentarla o eliminarla una vez que confirmes que los datos llegan por WebSocket.
-  /*
-  console.warn("Usando datos simulados para processPixelArtData. Reemplaza con tu lógica real de carga de datos (WebSocket/API).");
-  setTimeout(() => {
-      const simulatedBackendData = { 
-          mediaType: 'pixelmap',
-          pixelMapConfig: {
-              colors: [ '#FF0000', '#00FF00', '#0000FF', '#FFFFFF', '#F000FF' ],
-              logoUrl: 'https://res.cloudinary.com/ditgncrxp/image/upload/v1747450660/easypanel_media/pixelmap_assets/logo_vixionfest_1747450660685.png',
-              audioUrl: 'https://res.cloudinary.com/ditgncrxp/video/upload/v1747450663/easypanel_media/pixelmap_assets/audio_vixionfest_1747450661227.mp3',
-          },
-          originalName: 'Vixionfest (Simulado)'
-      };
-      processPixelArtData(simulatedBackendData);
-  }, 1000); 
-  */
-
+  console.log("[DBUG] onMounted - Listeners de socket registrados."); // NUEVO LOG
 });
 
 onUnmounted(() => {
+  console.log("[DBUG] onUnmounted - Desmontando componente..."); // NUEVO LOG
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
   }
@@ -459,20 +449,19 @@ onUnmounted(() => {
     analyserNode.disconnect();
   }
   if (audioContext && audioContext.state !== 'closed') {
-    audioContext.close().catch(e => console.error("Error cerrando AudioContext:", e));
+    audioContext.close().catch(e => console.error("[DBUG] onUnmounted - Error cerrando AudioContext:", e)); // Log de error mejorado
     audioContext = null; 
   }
-  // Desconectar el socket al desmontar el componente
   if (socket) {
-    console.log("Desconectando socket...");
+    console.log("[DBUG] onUnmounted - Desconectando socket..."); // NUEVO LOG
     socket.disconnect();
-    socket = null; // Limpiar la referencia
+    socket = null; 
   }
 });
 
 watch(audioUrlFromData, (newUrl, oldUrl) => {
   if (newUrl && newUrl !== oldUrl && audioPlayerElementRef.value) {
-    console.log("Nueva URL de audio detectada, reiniciando sincronización:", newUrl);
+    console.log("[DBUG] watch audioUrlFromData - Nueva URL de audio detectada, reiniciando sincronización:", newUrl); // NUEVO LOG
     if (audioPlayerElementRef.value) audioPlayerElementRef.value.pause();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     if (mediaElementSourceNode) mediaElementSourceNode.disconnect();
