@@ -42,8 +42,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
-// import { useRoute } from 'vue-router'; // Si usas Vue Router para obtener el activatorId
-// import io from 'socket.io-client'; // Si usas Socket.io para recibir datos
+// import { useRoute } from 'vue-router'; // Descomenta si usas Vue Router para obtener el activatorId
+import io from 'socket.io-client'; // Importar socket.io-client
 
 // --- Variables Reactivas del Componente ---
 const pixelArtData = ref(null); 
@@ -58,7 +58,7 @@ const audioPlayerElementRef = ref(null);
 
 const musicStatusMessage = ref('Esperando datos del Pixel Map...');
 
-// --- Configuración de la Web Audio API y Detección de Beats ---
+// --- Configuración de Web Audio API y Detección de Beats ---
 let audioContext = null;
 let analyserNode = null;
 let mediaElementSourceNode = null;
@@ -78,19 +78,17 @@ const beatEffectColorPalette = [
 ];
 let lastUsedBeatColorIndex = -1;
 
+// --- Variable para el Socket ---
+let socket = null;
+
 // --- Lógica del Componente ---
 
 // 1. PROCESAMIENTO DE DATOS DEL PIXEL ART RECIBIDOS DEL BACKEND
-// Esta función ahora procesa los datos que vienen de tu backend
-// (ej. a través de un evento WebSocket o una llamada API inicial).
 function processPixelArtData(receivedContent) {
-  // receivedContent es el objeto que mostraste en el log:
-  // { mediaType: 'pixelmap', pixelMapConfig: { colors: [], logoUrl: '', ... }, originalName: '' }
-  
   if (!receivedContent || receivedContent.mediaType !== 'pixelmap' || !receivedContent.pixelMapConfig) {
     musicStatusMessage.value = "Datos del Pixel Map inválidos o no recibidos.";
     console.error("Datos del Pixel Map inválidos:", receivedContent);
-    pixels.value = []; // Limpiar píxeles si los datos son incorrectos
+    pixels.value = []; 
     logoUrl.value = '';
     audioUrlFromData.value = '';
     return;
@@ -100,36 +98,30 @@ function processPixelArtData(receivedContent) {
   
   musicStatusMessage.value = `Configurando: ${receivedContent.originalName || 'Pixel Map'}`;
   
-  pixelArtData.value = receivedContent; // Guardar todos los datos recibidos
+  pixelArtData.value = receivedContent; 
   pixelArtName.value = receivedContent.originalName || 'Pixel Map sin nombre';
   logoUrl.value = config.logoUrl || '';
   audioUrlFromData.value = config.audioUrl || '';
 
-  // Procesar los píxeles y sus colores base
-  // ASUNCIÓN: La ESTRUCTURA de la cuadrícula (ej. 10x10) se define aquí en el frontend
-  // o también podría venir del backend si tuvieras una propiedad 'gridLayout' o similar.
-  // Por ahora, creamos una cuadrícula de ejemplo 10x10.
-  const numGridRows = 10;
-  const numGridCols = 10;
+  const numGridRows = 10; // O obtén esto del backend si es configurable
+  const numGridCols = 10; // O obtén esto del backend si es configurable
   const totalPixelsInGrid = numGridRows * numGridCols;
   const newPixelsArray = [];
 
   if (config.colors && config.colors.length > 0) {
     for (let i = 0; i < totalPixelsInGrid; i++) {
-      // Asignar colores del backend de forma cíclica a la cuadrícula
       const colorFromBackend = config.colors[i % config.colors.length];
       newPixelsArray.push({
         id: `px${i}`,
         originalColor: colorFromBackend,
-        x: (i % numGridCols) * (100 / numGridCols), // %
-        y: Math.floor(i / numGridCols) * (100 / numGridRows), // %
-        width: (100 / numGridCols), // %
-        height: (100 / numGridRows), // %
-        currentStyle: { backgroundColor: colorFromBackend } // Estilo inicial
+        x: (i % numGridCols) * (100 / numGridCols), 
+        y: Math.floor(i / numGridCols) * (100 / numGridRows), 
+        width: (100 / numGridCols), 
+        height: (100 / numGridRows), 
+        currentStyle: { backgroundColor: colorFromBackend } 
       });
     }
   } else {
-    // Fallback si no hay colores definidos en el backend (quizás mostrar píxeles grises o un mensaje)
     console.warn("No se proporcionaron colores en pixelMapConfig. Creando píxeles con color por defecto.");
     for (let i = 0; i < totalPixelsInGrid; i++) {
       const defaultColor = '#333333';
@@ -147,14 +139,13 @@ function processPixelArtData(receivedContent) {
   pixels.value = newPixelsArray;
 
   if (audioUrlFromData.value) {
-    nextTick().then(() => { // Esperar a que el DOM (audioPlayerElementRef) esté disponible
+    nextTick().then(() => { 
       initializeAudioSynchronization();
     });
   } else {
     musicStatusMessage.value = "No hay audio configurado para este Pixel Map.";
   }
 }
-
 
 // 2. Funciones para Estilos Dinámicos
 const visualizerAreaStyle = computed(() => ({
@@ -225,7 +216,6 @@ function initializeAudioSynchronization() {
   audioPlayerElementRef.value.crossOrigin = "anonymous"; 
 
   const setupAndPlay = () => {
-    // Asegurarse de que el AudioContext esté activo antes de conectar nodos
     if (audioContext.state === 'suspended') {
       audioContext.resume().then(actuallySetupAndPlay).catch(e => {
         musicStatusMessage.value = "Haz clic en el visualizador para activar audio.";
@@ -260,13 +250,11 @@ function initializeAudioSynchronization() {
   };
   
   const attemptToPlayAudio = () => {
-     if (audioContext && audioPlayerElementRef.value && audioPlayerElementRef.value.src) { // Asegurarse que src esté seteado
+     if (audioContext && audioPlayerElementRef.value && audioPlayerElementRef.value.src) { 
         if (audioContext.state === 'running') {
-            // Chequear readyState para asegurar que el audio está listo para ser conectado
             if (audioPlayerElementRef.value.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) { 
                 setupAndPlay();
             } else {
-                // Si no está listo, esperar al evento 'canplaythrough' o 'loadeddata'
                 audioPlayerElementRef.value.addEventListener('canplaythrough', setupAndPlay, { once: true });
             }
         } else { 
@@ -280,7 +268,7 @@ function initializeAudioSynchronization() {
     musicStatusMessage.value = "Error cargando archivo de audio. Verifica la URL y CORS.";
   });
   
-   if (audioPlayerElementRef.value.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) { // HAVE_ENOUGH_DATA es más robusto
+   if (audioPlayerElementRef.value.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) { 
         attemptToPlayAudio();
     } else {
         audioPlayerElementRef.value.addEventListener('canplaythrough', attemptToPlayAudio, { once: true });
@@ -349,8 +337,7 @@ function renderMusicVisualizationFrame() {
 function actualizarVisualesConBeat(datosDelBeat) {
   const beatIntensity = Math.min(1, datosDelBeat.energia / 220); 
 
-  // A. Actualizar los Píxeles
-  pixels.value.forEach((pixelData) => { // No necesitamos 'index' si modificamos pixelData directamente
+  pixels.value.forEach((pixelData) => { 
     if (pixelData) {
       const originalPixelColor = pixelData.originalColor;
       pixelData.currentStyle = {
@@ -370,7 +357,6 @@ function actualizarVisualesConBeat(datosDelBeat) {
     }
   });
 
-  // B. Actualizar el Logo
   if (logoRef.value) {
     const logoElement = logoRef.value;
     logoElement.style.transform = `translate(-50%, -50%) scale(${1 + beatIntensity * 0.05})`; 
@@ -387,45 +373,67 @@ function actualizarVisualesConBeat(datosDelBeat) {
 onMounted(() => {
   pixelRefs.value = []; 
   
-  // Obtener el ID del activador (ej. 'activate01')
-  // Este es un ejemplo simple. Si usas Vue Router, usa `useRoute().params.id`
   const activatorIdFromPath = window.location.pathname.split('/').pop() || 'default'; 
   
-  // Si recibes datos vía WebSocket:
-  // 1. Establece la conexión con el servidor WebSocket aquí.
-  // 2. Define un listener para el evento 'contentUpdate' (o como lo llames).
-  //    socket.on('contentUpdate', (data) => {
-  //        if (data.activatorId === activatorIdFromPath) { // Asegúrate que es para este activador
-  //            console.log("Datos recibidos vía WebSocket:", data);
-  //            processPixelArtData(data.content); // 'content' es el objeto que mostraste en el log
-  //        }
-  //    });
-  // 3. Podrías necesitar emitir un evento al servidor para "unirte" a la sala del activador:
-  //    socket.emit('joinRoom', activatorIdFromPath);
+  // --- INICIO: Lógica de WebSocket ---
+  // Asegúrate que la URL del servidor WebSocket sea correcta.
+  // Si tu backend está en el mismo host/puerto, esto podría funcionar:
+  // const SOCKET_SERVER_URL = window.location.origin; 
+  // O especifica la URL completa si es diferente:
+  const SOCKET_SERVER_URL = 'wss://activate.scanmee.io'; // O 'ws://localhost:PORT' para desarrollo local si tu backend corre en otro puerto
+                                                       // Reemplaza con la URL real de tu servidor WebSocket
+  
+  // Verificar si ya existe una conexión para evitar duplicados si el componente se remonta rápidamente (aunque onUnmounted debería manejarlo)
+  if (socket && socket.connected) {
+      console.log("Socket ya conectado.");
+  } else {
+      socket = io(SOCKET_SERVER_URL, {
+          // Opciones de Socket.io si las necesitas, por ejemplo, para reconexión, transportes, etc.
+          // transports: ['websocket'], // Forzar websocket si es necesario
+          // query: { token: 'tu_token_de_autenticacion_si_es_necesario_para_la_conexion' } // Si necesitas enviar un token al conectar
+      });
+  }
 
-  // SI NO USAS WEBSOCKETS y necesitas cargar datos con una llamada API al montar:
-  // Llama a una función que haga el fetch y luego llame a processPixelArtData.
-  // Ejemplo:
-  // async function fetchInitialData(activatorId) {
-  //   try {
-  //     musicStatusMessage.value = `Cargando configuración para ${activatorId}...`;
-  //     const response = await fetch(`/api/pixelart-config/${activatorId}`); // TU ENDPOINT REAL
-  //     if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-  //     const data = await response.json(); // Asume que tu API devuelve el objeto como el log
-  //     processPixelArtData(data); // data debería tener la estructura { mediaType, pixelMapConfig, originalName }
-  //   } catch (error) {
-  //     console.error("Error fetching initial Pixel Art data:", error);
-  //     musicStatusMessage.value = "Error al cargar configuración inicial.";
-  //   }
-  // }
-  // fetchInitialData(activatorIdFromPath);
 
-  // --- SIMULACIÓN DE RECEPCIÓN DE DATOS (para prueba si no tienes WebSocket o API lista) ---
-  // Esto simula que recibes los datos del log después de un momento.
-  // ¡¡¡REEMPLAZA ESTO CON TU LÓGICA REAL DE WEBSOCKETS O FETCH API!!!
+  socket.on('connect', () => {
+    console.log(`Socket conectado con ID: ${socket.id}`);
+    musicStatusMessage.value = `Conectado. Esperando datos para sala: ${activatorIdFromPath}`;
+    // Unirse a la sala específica del activador
+    socket.emit('joinRoom', activatorIdFromPath); 
+    console.log(`Emitiendo 'joinRoom' para la sala: ${activatorIdFromPath}`);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log(`Socket desconectado: ${reason}`);
+    musicStatusMessage.value = "Desconectado del servidor de actualizaciones.";
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('Error de conexión WebSocket:', error);
+    musicStatusMessage.value = "Error al conectar con el servidor de actualizaciones.";
+  });
+
+  // Escuchar el evento 'contentUpdate' que emite tu backend
+  socket.on('contentUpdate', (data) => {
+    // El log del backend muestra que 'data' es el objeto completo
+    // { mediaType: 'pixelmap', pixelMapConfig: {...}, originalName: 'Vixionfest' }
+    // No necesitas data.content a menos que el backend anide el contenido.
+    // Basado en tu log: "Evento 'contentUpdate' emitido a sala activate02 con contenido: { EL_OBJETO }"
+    // Entonces 'data' ya es el objeto de contenido.
+    console.log("Evento 'contentUpdate' recibido del servidor:", data);
+    // Podrías añadir una comprobación para asegurar que es para el activador correcto si el servidor no filtra por sala
+    // if (data.activatorId === activatorIdFromPath) { // Si el backend no anida activatorId en el payload del evento
+         processPixelArtData(data);
+    // }
+  });
+  // --- FIN: Lógica de WebSocket ---
+
+  // La simulación de datos ya no es necesaria si WebSocket funciona.
+  // Puedes comentarla o eliminarla una vez que confirmes que los datos llegan por WebSocket.
+  /*
   console.warn("Usando datos simulados para processPixelArtData. Reemplaza con tu lógica real de carga de datos (WebSocket/API).");
   setTimeout(() => {
-      const simulatedBackendData = { // Basado en tu log
+      const simulatedBackendData = { 
           mediaType: 'pixelmap',
           pixelMapConfig: {
               colors: [ '#FF0000', '#00FF00', '#0000FF', '#FFFFFF', '#F000FF' ],
@@ -435,8 +443,8 @@ onMounted(() => {
           originalName: 'Vixionfest (Simulado)'
       };
       processPixelArtData(simulatedBackendData);
-  }, 1000); // Simular un pequeño retraso
-  // --- FIN DE SIMULACIÓN ---
+  }, 1000); 
+  */
 
 });
 
@@ -454,10 +462,12 @@ onUnmounted(() => {
     audioContext.close().catch(e => console.error("Error cerrando AudioContext:", e));
     audioContext = null; 
   }
-  // Si usas WebSockets, desconéctate aquí:
-  // if (socket) {
-  //   socket.disconnect();
-  // }
+  // Desconectar el socket al desmontar el componente
+  if (socket) {
+    console.log("Desconectando socket...");
+    socket.disconnect();
+    socket = null; // Limpiar la referencia
+  }
 });
 
 watch(audioUrlFromData, (newUrl, oldUrl) => {
@@ -465,11 +475,8 @@ watch(audioUrlFromData, (newUrl, oldUrl) => {
     console.log("Nueva URL de audio detectada, reiniciando sincronización:", newUrl);
     if (audioPlayerElementRef.value) audioPlayerElementRef.value.pause();
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    // Desconectar nodos de audio antes de reconfigurar
     if (mediaElementSourceNode) mediaElementSourceNode.disconnect();
-    // No es necesario desconectar analyserNode de destination, pero sí la fuente de él.
-
-    // Esperar al siguiente tick para asegurar que el DOM esté actualizado si es necesario
+    
     nextTick().then(() => {
         initializeAudioSynchronization();
     });
