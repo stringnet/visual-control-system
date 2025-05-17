@@ -418,6 +418,7 @@ onMounted(() => {
         console.log("[DBUG_ONMOUNTED_SOCKET_INSTANCE] Nueva instancia de socket creada."); 
       } catch (e) {
         console.error("[DBUG_ONMOUNTED_SOCKET_INSTANCE_ERROR] Error creando instancia de socket:", e);
+        musicStatusMessage.value = "Error al inicializar conexión de socket."; // Mensaje para el usuario
         return; 
       }
   }
@@ -461,7 +462,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  console.log("[DBUG_ONMOUNTED_START] Desmontando componente..."); // Corregido: Debería ser ONUNMOUNTED_START
+  console.log("[DBUG_ONUNMOUNTED_START] Desmontando componente...");
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
   }
@@ -476,7 +477,7 @@ onUnmounted(() => {
     audioContext = null; 
   }
   if (socket) {
-    console.log("[DBUG_ONUNMOUNTED_SOCKET_DISCONNECT] Desconectando socket..."); // Corregido
+    console.log("[DBUG_ONUNMOUNTED_SOCKET_DISCONNECT] Desconectando socket..."); 
     socket.disconnect();
     socket = null; 
   }
